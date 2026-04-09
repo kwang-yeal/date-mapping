@@ -1,0 +1,2177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>데이터 이전 매핑 툴</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Noto Sans KR',sans-serif;font-size:13px;background:#f0f2f5;color:#1a1d23;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+button{cursor:pointer;font-family:inherit}
+input,select{font-family:inherit}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:#f0f0f0}
+::-webkit-scrollbar-thumb{background:#bbb;border-radius:4px}
+::-webkit-scrollbar-corner{background:#f0f0f0}
+
+/* ── 상단바 ── */
+#topbar{background:#1e293b;color:#fff;padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:100}
+#brand{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
+#stepper{display:flex;align-items:center;gap:0}
+.step{display:flex;align-items:center;gap:6px;color:#94a3b8;font-size:12px;font-weight:500}
+.step.active{color:#60a5fa}
+.step.done{color:#34d399}
+.step-circle{width:22px;height:22px;border-radius:50%;border:2px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.step-line{width:28px;height:2px;background:#334155;margin:0 4px}
+.step-line.done{background:#34d399}
+#reset-btn{background:none;border:1px solid #475569;border-radius:6px;padding:4px 12px;color:#94a3b8;font-size:12px}
+#reset-btn:hover{color:#fff;border-color:#94a3b8}
+.btn-primary{background:#2563eb;color:#fff;border:none;border-radius:7px;padding:8px 20px;font-weight:600;font-size:13px}
+.btn-primary:hover{background:#1d4ed8}
+.btn-secondary{background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:7px;padding:8px 16px;font-size:13px}
+.btn-secondary:hover{background:#f9fafb}
+.btn-green{background:#059669;color:#fff;border:none;border-radius:7px;padding:8px 20px;font-weight:700;font-size:13px}
+.btn-green:hover{background:#047857}
+
+/* ── 메인 ── */
+#main{flex:1;overflow:hidden;display:flex;flex-direction:column;position:relative}
+
+/* ════════ STEP 1: 업로드 ════════ */
+#step-upload{flex:1;display:flex;align-items:center;justify-content:center}
+.upload-card{background:#fff;border-radius:16px;padding:48px 40px;max-width:520px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.upload-card h2{font-size:22px;font-weight:700;margin-bottom:8px}
+.upload-card p{color:#6b7280;line-height:1.65;margin-bottom:24px;font-size:14px}
+#dropzone{border:2px dashed #cbd5e1;border-radius:12px;padding:48px 24px;text-align:center;cursor:pointer;background:#f8fafc;transition:.15s}
+#dropzone:hover,#dropzone.drag{border-color:#3b82f6;background:#eff6ff}
+.dz-icon{font-size:44px;margin-bottom:10px}
+.dz-text{font-size:15px;font-weight:600;color:#374151;margin-bottom:4px}
+.dz-sub{font-size:13px;color:#9ca3af}
+#sheet-box{display:none;flex-direction:column;gap:14px;margin-top:16px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:18px}
+.frow{display:flex;align-items:center;gap:10px}
+.frow label{width:90px;font-weight:600;color:#374151;font-size:13px;flex-shrink:0}
+.frow select{border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;background:#fff;min-width:180px}
+.fhint{font-size:11px;color:#9ca3af}
+.fbtns{display:flex;gap:8px;justify-content:flex-end}
+.err{color:#dc2626;background:#fef2f2;padding:7px 12px;border-radius:6px;margin-top:10px;display:none;font-size:13px}
+
+/* ════════ STEP 2: 매핑 (엑셀형) ════════ */
+#step-mapping{flex:1;display:none;flex-direction:column;overflow:hidden}
+
+/* 툴바 */
+#mapping-toolbar{background:#fff;border-bottom:1px solid #e5e7eb;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:12px}
+.tb-left{display:flex;align-items:center;gap:12px}
+.tb-title{font-size:15px;font-weight:700}
+.tb-desc{font-size:12px;color:#6b7280}
+.tb-stat{background:#eff6ff;color:#1d4ed8;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700}
+.tb-right{display:flex;align-items:center;gap:8px}
+
+/* ── 미매칭 컬럼 트레이 ── */
+#unmatched-tray{
+  background:#fffbeb;border-bottom:1px solid #fde68a;
+  padding:7px 14px;flex-shrink:0;
+  display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;
+  min-height:36px;
+}
+#unmatched-tray .tray-label{
+  font-size:11px;font-weight:700;color:#92400e;
+  white-space:nowrap;padding-top:3px;flex-shrink:0;
+}
+.tray-btn{
+  background:#fff;border:1px solid #f59e0b;color:#92400e;
+  border-radius:5px;padding:3px 9px;font-size:12px;font-weight:500;
+  cursor:pointer;display:flex;align-items:center;gap:4px;
+  transition:all .12s;white-space:nowrap;
+}
+.tray-btn:hover{background:#fef3c7;border-color:#d97706}
+.tray-btn.active{background:#f59e0b;color:#fff;border-color:#d97706}
+.tray-btn .tray-sample{font-size:10px;color:#b45309;max-width:80px;overflow:hidden;text-overflow:ellipsis}
+.tray-btn.active .tray-sample{color:#fef3c7}
+
+/* 섹션 탭 */
+#section-tabs{display:flex;gap:0;background:#f8fafc;border-bottom:1px solid #e5e7eb;flex-shrink:0;overflow-x:auto}
+.sec-tab{padding:8px 18px;border:none;background:transparent;border-bottom:3px solid transparent;color:#6b7280;font-size:13px;font-weight:500;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.sec-tab.active{border-bottom-color:#2563eb;color:#2563eb;background:#fff}
+.sec-tab:hover:not(.active){color:#374151;background:#f1f5f9}
+.sec-badge{background:#e5e7eb;border-radius:99px;padding:1px 7px;font-size:11px;font-weight:700}
+.sec-tab.active .sec-badge{background:#dbeafe;color:#1d4ed8}
+.sec-tab.sec-done .sec-badge{background:#dcfce7;color:#166534}
+
+/* ── 스프레드시트 + 임시 패널 래퍼 ── */
+#mapping-body{flex:1;display:flex;overflow:hidden;min-height:0}
+
+/* 스프레드시트 컨테이너 */
+#sheet-container{flex:1;overflow:auto;position:relative;min-width:0}
+
+/* 스프레드시트 테이블 */
+#sheet-table{border-collapse:collapse;table-layout:fixed;font-size:12px}
+
+/* 행 번호 열 */
+.rn-col{width:36px;min-width:36px}
+.rn-cell{width:36px;min-width:36px;background:#f8fafc;border:1px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:11px;position:sticky;left:0;z-index:3}
+
+/* A양식 헤더 행 (1행) - 고정 */
+.row-a-header th{
+  position:sticky;top:0;z-index:10;
+  background:#1e293b;color:#fff;
+  border:1px solid #334155;
+  padding:7px 10px;
+  white-space:nowrap;
+  font-size:12px;
+  font-weight:600;
+  min-width:100px;
+  max-width:none;
+  overflow:hidden;text-overflow:ellipsis;
+  user-select:none;
+}
+.row-a-header .rn-cell{top:0;z-index:15;background:#0f172a;color:#64748b;border-color:#0f172a}
+.required-dot{color:#f87171;margin-left:2px}
+
+/* 컬럼 헤더 드래그 핸들 */
+.col-drag-handle{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  cursor:grab;display:flex;align-items:center;
+}
+.col-drag-handle:active{cursor:grabbing}
+th.dragging{opacity:.5;background:#0f4c81!important}
+th.drag-over{border-left:3px solid #60a5fa!important}
+
+/* 컬럼 리사이즈 핸들 */
+.resize-handle{
+  position:absolute;top:0;right:0;width:5px;height:100%;
+  cursor:col-resize;background:transparent;z-index:20;
+}
+.resize-handle:hover,.resize-handle.resizing{background:rgba(96,165,250,.5)}
+
+/* B파일 컬럼명 행 (2행) - 고정 */
+.row-b-header td{
+  position:sticky;top:33px;z-index:9;
+  background:#1e3a5f;color:#93c5fd;
+  border:1px solid #1d4ed8;
+  padding:5px 8px;
+  white-space:nowrap;
+  font-size:11px;
+  cursor:pointer;
+  transition:.1s;
+  min-width:100px;
+  max-width:none;
+  overflow:hidden;
+}
+.row-b-header td:hover:not(.rn-cell){background:#1e40af;color:#fff}
+.row-b-header .rn-cell{top:33px;z-index:14;background:#0f172a;border-color:#0f172a}
+.b-col-name{font-weight:600;font-size:11px;display:flex;align-items:center;gap:4px;overflow:hidden}
+.b-col-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.b-unmapped{color:#475569;font-style:italic}
+.b-conf{font-size:10px;padding:1px 5px;border-radius:99px;background:rgba(255,255,255,.15);flex-shrink:0}
+.b-edit-btn{opacity:0;font-size:10px;margin-left:2px;flex-shrink:0}
+.row-b-header td:hover .b-edit-btn{opacity:1}
+.multi-tag{display:flex;flex-direction:column;gap:2px}
+.multi-chip{background:rgba(255,255,255,.2);border-radius:3px;padding:1px 5px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
+
+/* 데이터 행 */
+.row-data td{
+  border:1px solid #e2e8f0;
+  padding:5px 8px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  min-width:100px;
+  max-width:none;
+  color:#374151;
+  background:#fff;
+}
+.row-data:nth-child(odd) td{background:#fafbfc}
+.row-data td.mapped-col{background:#f0fdf4}
+.row-data:nth-child(odd) td.mapped-col{background:#ecfdf5}
+.row-data td.empty-val{color:#d1d5db}
+.row-data td.click-col{cursor:pointer}
+.row-data td.click-col:hover{background:#eff6ff!important}
+
+/* ── 임시 원본 컬럼 패널 ── */
+#temp-col-panel{
+  width:0;min-width:0;overflow:hidden;
+  background:#f8f4ff;border-left:2px dashed #a78bfa;
+  display:flex;flex-direction:column;
+  transition:width .2s ease;flex-shrink:0;
+}
+#temp-col-panel.open{width:280px;min-width:220px;}
+#temp-panel-header{
+  padding:8px 12px;background:#ede9fe;border-bottom:1px solid #c4b5fd;
+  font-size:11px;font-weight:700;color:#6d28d9;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;white-space:nowrap;
+}
+#temp-panel-header span{display:flex;align-items:center;gap:5px}
+#temp-cols-wrap{flex:1;overflow:auto;display:flex;gap:0}
+
+/* 임시 컬럼 각각 */
+.temp-col{
+  min-width:130px;max-width:130px;
+  border-right:1px solid #ddd6fe;
+  display:flex;flex-direction:column;flex-shrink:0;
+}
+.temp-col-hdr{
+  background:#7c3aed;color:#fff;
+  padding:6px 8px;font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:5;
+  cursor:grab;user-select:none;
+  white-space:nowrap;overflow:hidden;
+}
+.temp-col-hdr:active{cursor:grabbing}
+.temp-col-hdr.dragging-col{opacity:.4;box-shadow:0 6px 20px rgba(124,58,237,.5);}
+.temp-col-hdr .col-close{
+  background:none;border:none;color:#ddd6fe;
+  font-size:13px;line-height:1;cursor:pointer;flex-shrink:0;
+  padding:0 2px;
+}
+.temp-col-hdr .col-close:hover{color:#fff}
+.temp-col-hdr .drag-hint{font-size:9px;color:#c4b5fd;margin-right:4px;}
+.temp-col-name{overflow:hidden;text-overflow:ellipsis;flex:1}
+.temp-col-cell{
+  padding:5px 8px;font-size:12px;
+  border-bottom:1px solid #ede9fe;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:#faf5ff;color:#4c1d95;
+  min-height:26px;
+}
+.temp-col-cell:nth-child(even){background:#f3e8ff}
+.temp-col-empty{color:#c4b5fd;font-style:italic}
+
+/* target 헤더 드롭 하이라이트 */
+.row-a-header th.drop-target-hover{
+  background:#7c3aed!important;
+  outline:2px solid #a78bfa;
+  outline-offset:-2px;
+}
+
+/* 드래그 고스트 (커스텀) */
+#drag-ghost{
+  position:fixed;z-index:9999;pointer-events:none;
+  background:#7c3aed;color:#fff;
+  padding:5px 12px;border-radius:6px;font-size:12px;font-weight:700;
+  box-shadow:0 8px 24px rgba(124,58,237,.5);
+  opacity:.92;display:none;white-space:nowrap;
+}
+
+/* 매핑 성공 flash */
+@keyframes flashGreen{0%{background:#16a34a}100%{background:inherit}}
+.mapped-flash{animation:flashGreen .5s ease-out;}
+/* ════════ STEP 3: 미리보기 ════════ */
+#step-preview{
+  display:none;
+  flex-direction:column;
+  background:#f0f2f5;
+  /* topbar 바로 아래 전체를 차지 */
+  position:fixed;
+  top:52px; left:0; right:0; bottom:0;
+  z-index:40;
+  overflow:hidden;
+}
+#step-preview.visible{display:flex}
+#preview-toolbar{
+  background:#fff;
+  border-bottom:1px solid #e5e7eb;
+  padding:10px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-shrink:0;
+  box-shadow:0 1px 4px rgba(0,0,0,.06);
+}
+#preview-container{flex:1;overflow:auto;}
+#preview-table{
+  border-collapse:collapse;
+  table-layout:fixed;
+  font-size:12px;
+  width:max-content;
+  min-width:100%;
+}
+#preview-table th{
+  background:#0f172a;color:#e2e8f0;
+  border:1px solid #1e293b;
+  padding:7px 10px;
+  white-space:nowrap;
+  position:sticky;top:0;z-index:5;
+  min-width:120px;
+  font-size:11px;font-weight:600;text-align:left;
+}
+#preview-table th.rn-th{
+  min-width:36px;width:36px;
+  background:#0f172a;
+  position:sticky;top:0;left:0;z-index:10;
+}
+#preview-table td{
+  border:1px solid #e2e8f0;
+  padding:5px 10px;
+  white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+  min-width:120px;max-width:200px;
+  background:#fff;
+}
+#preview-table tr:nth-child(even) td{background:#f8fafc}
+#preview-table td.rn-td{
+  background:#f1f5f9;color:#94a3b8;
+  text-align:center;font-size:11px;
+  position:sticky;left:0;z-index:2;
+  min-width:36px;width:36px;max-width:36px;
+}
+#preview-table td.empty-v{color:#d1d5db}
+.prev-sub-header{font-size:10px;color:#64748b;font-weight:400;margin-top:2px}
+.success-bar{
+  background:#f0fdf4;border-bottom:1px solid #bbf7d0;
+  color:#166534;padding:8px 16px;
+  font-weight:600;font-size:13px;
+  display:none;flex-shrink:0;
+}
+
+/* ════════ 모달 ════════ */
+#modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:center;justify-content:center}
+#modal-overlay.open{display:flex}
+#modal{background:#fff;border-radius:14px;width:520px;max-width:95vw;max-height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.mhdr{padding:18px 22px 12px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #f0f0f0}
+.mhdr-sec{font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.mhdr-title{font-size:17px;font-weight:700;margin-top:2px}
+.mclose{background:none;border:none;font-size:20px;color:#9ca3af;line-height:1;padding:2px}
+.mclose:hover{color:#374151}
+.mdesc{padding:8px 22px 4px;font-size:12px;color:#6b7280}
+.msel-box{margin:6px 22px;background:#eff6ff;border-radius:8px;padding:7px 10px;display:none}
+.msel-label{font-size:10px;color:#3b82f6;font-weight:700;margin-bottom:5px}
+.msel-tags{display:flex;flex-wrap:wrap;gap:4px}
+.mtag{background:#3b82f6;color:#fff;border-radius:5px;padding:3px 9px;font-size:12px;display:flex;align-items:center;gap:5px}
+.mtag-rm{background:none;border:none;color:#bfdbfe;font-size:12px;line-height:1;padding:0}
+.msearch{margin:6px 22px;padding:7px 11px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;width:calc(100% - 44px)}
+.mlist{flex:1;overflow-y:auto}
+.mitem{display:flex;align-items:flex-start;padding:9px 22px;cursor:pointer;border-bottom:1px solid #f9f9f9;gap:10px}
+.mitem:hover{background:#f8fafc}
+.mitem.sel{background:#f0fdf4}
+.mchk{font-size:15px;color:#9ca3af;flex-shrink:0;margin-top:1px;width:18px}
+.mitem.sel .mchk{color:#16a34a}
+.mitem-name{font-weight:600;font-size:13px;margin-bottom:1px}
+.mitem-samples{font-size:11px;color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:380px}
+.mftr{padding:12px 22px;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center}
+.btn-clr{background:none;border:none;color:#6b7280;font-size:12px}
+</style>
+</head>
+<body>
+
+<!-- ══ 상단바 ══ -->
+<div id="topbar">
+  <div id="brand">⚡ 데이터 이전 매핑 툴</div>
+  <div id="stepper">
+    <div class="step active" id="s1"><div class="step-circle">1</div>업로드</div>
+    <div class="step-line" id="line1"></div>
+    <div class="step" id="s2"><div class="step-circle">2</div>매핑</div>
+    <div class="step-line" id="line2"></div>
+    <div class="step" id="s3"><div class="step-circle">3</div>다운로드</div>
+  </div>
+  <button id="reset-btn" onclick="resetAll()" style="display:none">↺ 처음부터</button>
+</div>
+
+<div id="main">
+
+  <!-- ════ STEP 1 ════ -->
+  <div id="step-upload">
+    <div class="upload-card">
+      <h2>📂 타사 엑셀 파일 업로드</h2>
+      <p>기존 프로그램에서 내보낸 엑셀 파일을 업로드하면<br>지킴E 일괄 업로드 양식 컬럼에 자동으로 매핑해 드립니다.</p>
+      <div id="dropzone"
+        onclick="document.getElementById('fi').click()"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="onDrop(event)">
+        <input type="file" id="fi" accept=".xlsx,.xls,.csv" style="display:none" onchange="onFile(this.files[0])">
+        <div id="dz-content">
+          <div class="dz-icon">📊</div>
+          <div class="dz-text">클릭하거나 파일을 여기에 드래그하세요</div>
+          <div class="dz-sub">.xlsx / .xls / .csv 지원</div>
+        </div>
+        <div id="dz-loading" style="display:none;color:#6b7280;padding:8px">⏳ 분석 중...</div>
+      </div>
+      <div id="sheet-box">
+        <div class="frow">
+          <label>파일 유형</label>
+          <select id="filetype-sel">
+            <option value="auto">🔍 자동 감지 (일반)</option>
+            <option value="tnb">🏢 TNB소프트</option>
+            <option value="cyberwin">💻 사이버윈</option>
+            <option value="bigthree">📊 빅쓰리</option>
+            <option value="elecin">⚡ 일렉인</option>
+          </select>
+          <span class="fhint" id="filetype-hint"></span>
+        </div>
+        <div style="height:1px;background:#e5e7eb;margin:2px 0"></div>
+        <div class="frow">
+          <label>시트 선택</label>
+          <select id="sheet-sel"></select>
+        </div>
+        <div class="frow" id="hrow-row">
+          <label>헤더 행</label>
+          <select id="hrow-sel">
+            <option value="0">1행 (헤더)</option>
+            <option value="1">2행 (헤더)</option>
+            <option value="2">3행 (헤더)</option>
+            <option value="3">4행 (헤더)</option>
+            <option value="4">5행 (헤더)</option>
+          </select>
+          <span class="fhint" id="hrow-hint">자동 감지됨. 이상하면 수동 변경</span>
+        </div>
+        <div class="fbtns">
+          <button class="btn-secondary" onclick="resetUpload()">다시 선택</button>
+          <button class="btn-primary" onclick="confirmSheet()">매핑 시작 →</button>
+        </div>
+      </div>
+      <div class="err" id="err"></div>
+    </div>
+  </div>
+
+  <!-- ════ STEP 2: 엑셀형 매핑 뷰 ════ -->
+  <div id="step-mapping">
+    <!-- 툴바 -->
+    <div id="mapping-toolbar">
+      <div class="tb-left">
+        <div>
+          <div class="tb-title">🔗 컬럼 매핑</div>
+          <div class="tb-desc">2행(파란색) 클릭 → 매핑 수정 | 1:N 다중 연결 가능</div>
+        </div>
+        <div class="tb-stat" id="tb-stat">0 / 0 매핑</div>
+        <div id="tb-template-badge" style="display:none;background:#dcfce7;color:#166534;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700;border:1px solid #bbf7d0">🏢 TNB소프트 템플릿 적용됨</div>
+      </div>
+      <div class="tb-right">
+        <button class="btn-secondary" onclick="goStep(1)">← 뒤로</button>
+        <button class="btn-primary" onclick="goStep(3)">미리보기 →</button>
+      </div>
+    </div>
+    <!-- 미매칭 컬럼 트레이 -->
+    <div id="unmatched-tray">
+      <span class="tray-label">📦 미매칭 원본 컬럼</span>
+    </div>
+    <!-- 섹션 탭 -->
+    <div id="section-tabs"></div>
+    <!-- 스프레드시트 + 임시 패널 -->
+    <div id="mapping-body">
+      <div id="sheet-container">
+        <table id="sheet-table">
+          <thead id="sheet-thead"></thead>
+          <tbody id="sheet-tbody"></tbody>
+        </table>
+      </div>
+      <!-- 임시 원본 컬럼 패널 -->
+      <div id="temp-col-panel">
+        <div id="temp-panel-header">
+          <span>🔍 원본 컬럼 미리보기</span>
+          <button onclick="closeAllTempCols()" style="background:none;border:none;color:#7c3aed;cursor:pointer;font-size:13px;padding:0" title="모두 닫기">✕</button>
+        </div>
+        <div id="temp-cols-wrap"></div>
+      </div>
+    </div>
+
+    </div><!-- /mapping-body -->
+  </div><!-- /step-mapping -->
+
+  <!-- ════ STEP 3: 미리보기 / 다운로드 ════ -->
+  <div id="step-preview">
+    <div id="preview-toolbar">
+      <div>
+        <div style="font-size:15px;font-weight:700">👀 변환 결과 확인 및 다운로드</div>
+        <div style="font-size:12px;color:#6b7280" id="prev-sub"></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-secondary" onclick="goStep(2)">← 매핑 수정</button>
+        <button class="btn-green" onclick="doDownload()">⬇ 지킴E 일괄 업로드 양식 다운로드</button>
+      </div>
+    </div>
+    <div class="success-bar" id="succ-bar">✅ 다운로드 완료! 우리 시스템에 업로드하시면 됩니다.</div>
+    <div id="preview-container">
+      <table id="preview-table">
+        <thead id="prev-thead"></thead>
+        <tbody id="prev-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- ════ 매핑 수정 모달 ════ -->
+<div id="modal-overlay" onclick="closeModal()">
+  <div id="modal" onclick="event.stopPropagation()">
+    <div class="mhdr">
+      <div>
+        <div class="mhdr-sec" id="m-sec"></div>
+        <div class="mhdr-title" id="m-title"></div>
+      </div>
+      <button class="mclose" onclick="closeModal()">✕</button>
+    </div>
+    <div class="mdesc">연결할 <strong>원본(B파일) 컬럼</strong>을 선택하세요. 여러 개 선택 = <strong>1:N 매핑</strong></div>
+    <div class="msel-box" id="msel-box">
+      <div class="msel-label">현재 선택:</div>
+      <div class="msel-tags" id="msel-tags"></div>
+    </div>
+    <input class="msearch" id="msearch" placeholder="컬럼명 검색..." oninput="renderMList()">
+    <div class="mlist" id="mlist"></div>
+    <div class="mftr">
+      <button class="btn-clr" onclick="clearMSel()">선택 초기화</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-secondary" onclick="closeModal()">취소</button>
+        <button class="btn-primary" onclick="saveModal()">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// A양식 컬럼 정의
+// ════════════════════════════════════════════════
+const A_COLS = [
+  // ── 관리번호 (최상단 고정) ──
+  {id:'cont_jikime_no',   name:'지킴E계약번호',      sec:'고객정보'},   // 1열
+  {id:'cust_mgmt_code',   name:'업체 관리코드',       sec:'고객정보'},   // 2열 (구 고객코드→업체관리코드)
+  // ── 고객정보 ──
+  {id:'cust_jikime_no',   name:'지킴E고객번호',      sec:'고객정보'},
+  {id:'cust_name',        name:'고객(사업자)명',     sec:'고객정보', req:true},
+  {id:'cust_biz_no',      name:'사업자번호',         sec:'고객정보', req:true},
+  {id:'cust_ceo',         name:'대표자',             sec:'고객정보'},
+  {id:'cust_zip',         name:'우편번호',           sec:'고객정보'},
+  {id:'cust_addr1',       name:'기본주소',           sec:'고객정보'},
+  {id:'cust_addr2',       name:'상세주소',           sec:'고객정보'},
+  {id:'cust_tel',         name:'대표연락처',         sec:'고객정보'},
+  {id:'cust_email',       name:'대표이메일',         sec:'고객정보'},
+  {id:'bldg_jikime_no',  name:'지킴E건물번호',      sec:'점검건물정보'},
+  {id:'bldg_name',       name:'점검건물명',         sec:'점검건물정보', req:true},
+  {id:'bldg_biz_name',   name:'사업자(계약)명',     sec:'점검건물정보'},
+  {id:'bldg_biz_no',     name:'사업자번호',         sec:'점검건물정보', req:true},
+  {id:'bldg_ceo',        name:'대표자',             sec:'점검건물정보'},
+  {id:'bldg_zip',        name:'우편번호',           sec:'점검건물정보'},
+  {id:'bldg_addr1',      name:'기본주소',           sec:'점검건물정보'},
+  {id:'bldg_addr2',      name:'상세주소',           sec:'점검건물정보'},
+  {id:'bldg_mail_zip',   name:'우편번호(수령지)',   sec:'점검건물정보'},
+  {id:'bldg_mail_addr1', name:'기본주소(수령지)',   sec:'점검건물정보'},
+  {id:'bldg_mail_addr2', name:'상세주소(수령지)',   sec:'점검건물정보'},
+  {id:'bldg_rcv_name',   name:'수신자',             sec:'점검건물정보'},
+  {id:'bldg_rcv_tel',    name:'수신자 연락처',      sec:'점검건물정보'},
+  {id:'bldg_biz_type',   name:'업태',               sec:'점검건물정보'},
+  {id:'bldg_biz_item',   name:'종목',               sec:'점검건물정보'},
+  {id:'bldg_usage',      name:'건물용도',           sec:'점검건물정보'},
+  {id:'cont_type',       name:'계약형태',           sec:'계약정보'},
+  {id:'cont_capacity',   name:'계약용량',           sec:'계약정보'},
+  {id:'cont_volt_type',  name:'전압형태',           sec:'계약정보'},
+  {id:'cont_recv_volt',  name:'수전전압(V)',         sec:'계약정보'},
+  {id:'cont_recv_cap',   name:'수전용량',           sec:'계약정보'},
+  {id:'cont_gen_volt',   name:'발전전압',           sec:'계약정보'},
+  {id:'cont_gen_cap',    name:'발전용량',           sec:'계약정보'},
+  {id:'cont_solar_volt', name:'태양광전압',         sec:'계약정보'},
+  {id:'cont_solar_cap',  name:'태양광용량',         sec:'계약정보'},
+  {id:'cont_score',      name:'관리점수(가중치)',   sec:'계약정보'},
+  {id:'cont_insp_cnt',   name:'월점검횟수',         sec:'계약정보'},
+  {id:'cont_inspector',  name:'점검자',             sec:'계약정보'},
+  {id:'cont_inspector2', name:'2ND',               sec:'계약정보'},
+  {id:'cont_sales',      name:'영업자',             sec:'계약정보'},
+  {id:'cont_status',     name:'계약진행상태',       sec:'계약정보'},
+  {id:'cont_start_date', name:'계약일',             sec:'계약정보'},
+  {id:'cont_end_date',   name:'계약만료일',         sec:'계약정보'},
+  {id:'cont_kepco_mgmt', name:'수용가 관리번호',    sec:'계약정보'},
+  {id:'cont_kepco_cust', name:'한전 고객번호',      sec:'계약정보'},
+  {id:'cont_safety_no',  name:'안전공사 고객번호',  sec:'계약정보'},
+  {id:'cont_insp_cycle', name:'정기점검 주기(년)',  sec:'계약정보'},
+  {id:'cont_last_insp',  name:'최종검사일',         sec:'계약정보'},
+  {id:'cont_mgr_name',   name:'관리담당자',         sec:'계약정보'},
+  {id:'cont_mgr_tel',    name:'관리담당자 연락처',  sec:'계약정보'},
+  {id:'cont_mgr_email',  name:'관리담당자 Email',   sec:'계약정보'},
+  {id:'cont_ctr_name',   name:'계약담당자',         sec:'계약정보'},
+  {id:'cont_ctr_tel',    name:'계약담당자 연락처',  sec:'계약정보'},
+  {id:'cont_ctr_email',  name:'계약담당자 Email',   sec:'계약정보'},
+  {id:'cont_fax',        name:'Fax No.',            sec:'계약정보'},
+  {id:'bill_supply',     name:'공급가액',           sec:'청구정보'},
+  {id:'bill_vat',        name:'부가세',             sec:'청구정보'},
+  {id:'bill_total',      name:'계약총액',           sec:'청구정보'},
+  {id:'bill_tax_type',   name:'과세유형',           sec:'청구정보'},
+  {id:'bill_invoice',    name:'계산서발행',         sec:'청구정보'},
+  {id:'bill_type',       name:'청구형태',           sec:'청구정보'},
+  {id:'bill_note',       name:'계산서 비고',        sec:'청구정보'},
+  {id:'bill_receipt',    name:'청구/영수',          sec:'청구정보'},
+  {id:'bill_date',       name:'청구일',             sec:'청구정보'},
+  {id:'bill_due_month',  name:'납부기한월',         sec:'청구정보'},
+  {id:'bill_due_day',    name:'납부기한일',         sec:'청구정보'},
+  {id:'bill_cms_payer',  name:'(CMS)납부자번호',    sec:'청구정보'},
+  {id:'bill_cms_bank',   name:'(CMS)출금은행',      sec:'청구정보'},
+  {id:'bill_cms_acct',   name:'(CMS)출금계좌',      sec:'청구정보'},
+  {id:'bill_cms_id',     name:'(CMS)실명확인번호',  sec:'청구정보'},
+  {id:'bill_note2',      name:'특이사항',           sec:'청구정보'},
+];
+const SECTIONS = ['고객정보','점검건물정보','계약정보','청구정보'];
+
+const SYNONYMS = {
+  cust_name:        ['고객명','업체명','거래처명','상호명','사업자명','회사명','업체','고객','거래처'],
+  cust_biz_no:      ['사업자번호','사업자등록번호','법인번호','사업자번호(고객)'],
+  cust_ceo:         ['대표자','대표이름','대표자명','대표'],
+  cust_zip:         ['우편번호','고객우편번호','우편','zip'],
+  cust_addr1:       ['기본주소','주소','소재지','주소1','도로명주소'],
+  cust_addr2:       ['상세주소','주소2','상세','건물명'],
+  cust_tel:         ['연락처','전화번호','대표전화','대표연락처','전화','고객연락처','tel','phone','핸드폰','휴대폰'],
+  cust_email:       ['이메일','메일','email','이메일주소','전자메일'],
+  bldg_name:        ['건물명','점검건물명','건물','점검건물','시설명','점검지'],
+  bldg_biz_no:      ['건물사업자번호','점검사업자번호','계약사업자번호','사업자번호(건물)'],
+  bldg_biz_name:    ['사업자계약명','건물업체명','계약명','점검업체명'],
+  bldg_ceo:         ['건물대표자','건물대표','계약대표자'],
+  bldg_zip:         ['건물우편번호','점검우편번호'],
+  bldg_addr1:       ['건물주소','점검주소','건물기본주소','점검지주소'],
+  bldg_addr2:       ['건물상세주소','점검상세주소'],
+  bldg_rcv_name:    ['수신자','수신자명'],
+  bldg_rcv_tel:     ['수신자연락처','수신연락처','수신전화'],
+  bldg_biz_type:    ['업태','사업업태'],
+  bldg_biz_item:    ['종목','사업종목','업종'],
+  bldg_usage:       ['건물용도','용도'],
+  cont_type:        ['계약형태','계약종류','서비스형태','계약유형'],
+  cont_capacity:    ['계약용량','설비용량','용량','계약전력'],
+  cont_volt_type:   ['전압형태','전압종류','저압고압','전압구분'],
+  cont_recv_volt:   ['수전전압','전압(v)','전압','수전전압(v)'],
+  cont_recv_cap:    ['수전용량','수전설비'],
+  cont_score:       ['관리점수','가중치','점수','관리가중치'],
+  cont_insp_cnt:    ['월점검횟수','점검횟수','월점검','방문횟수','점검회수'],
+  cont_inspector:   ['점검자','담당점검자','점검담당자','점검원'],
+  cont_sales:       ['영업자','영업담당자','영업담당'],
+  cont_status:      ['계약진행상태','진행상태','계약상태','상태','고객상태'],
+  cont_start_date:  ['계약일','계약시작일','시작일','계약체결일','계약개시일'],
+  cont_end_date:    ['계약만료일','만료일','종료일','계약종료일','만기일'],
+  cont_kepco_mgmt:  ['수용가관리번호','수용가번호','한전수용가','수용가'],
+  cont_kepco_cust:  ['한전고객번호','한전번호'],
+  cont_safety_no:   ['안전공사고객번호','안전공사번호'],
+  cont_insp_cycle:  ['정기점검주기','점검주기','주기(년)'],
+  cont_last_insp:   ['최종검사일','최종점검일','마지막검사일'],
+  cont_mgr_name:    ['관리담당자','관리자','담당자'],
+  cont_mgr_tel:     ['관리담당자연락처','관리자연락처','담당자연락처'],
+  cont_mgr_email:   ['관리담당자email','관리자이메일','담당자이메일'],
+  cont_ctr_name:    ['계약담당자','계약담당','청구담당자'],
+  cont_ctr_tel:     ['계약담당자연락처','청구담당자연락처'],
+  cont_ctr_email:   ['계약담당자email','청구담당자이메일'],
+  cont_fax:         ['팩스','fax','팩스번호'],
+  bill_supply:      ['공급가액','공급가','용역비','금액','서비스금액','월정료'],
+  bill_vat:         ['부가세','부가가치세','vat'],
+  bill_total:       ['계약총액','총액','합계','계약금액','총금액'],
+  bill_tax_type:    ['과세유형','세금유형','과세구분','과세여부'],
+  bill_invoice:     ['계산서발행','계산서','세금계산서'],
+  bill_type:        ['청구형태','청구방법','납부방법','청구유형'],
+  bill_date:        ['청구일','청구날짜'],
+  bill_due_month:   ['납부기한월','납부월','이체일'],
+  bill_due_day:     ['납부기한일','납부일'],
+  bill_cms_payer:   ['cms납부자번호','납부자번호'],
+  bill_cms_bank:    ['cms출금은행','출금은행','은행','은행명','수금경로'],
+  bill_cms_acct:    ['cms출금계좌','출금계좌','계좌번호','계좌'],
+  bill_cms_id:      ['cms실명확인번호','실명확인번호'],
+  bill_note2:       ['특이사항','비고','메모','참고'],
+};
+const PHINTS = {
+  business_number:['cust_biz_no','bldg_biz_no'],
+  phone:          ['cust_tel','bldg_rcv_tel','cont_mgr_tel','cont_ctr_tel'],
+  email:          ['cust_email','cont_mgr_email','cont_ctr_email'],
+  date:           ['cont_start_date','cont_end_date','cont_last_insp'],
+};
+
+// ════════════════════════════════════════════════
+// 앱 상태
+// ════════════════════════════════════════════════
+let S = {
+  wb:null, parsed:null,
+  mapping:{},          // {id:{idxs:[],conf,manual}}
+  activeSec:'고객정보',
+  mTargetId:null, mTempSel:[],
+  step:1,
+};
+
+// ════════════════════════════════════════════════
+// 스텝 이동
+// ════════════════════════════════════════════════
+function goStep(n){
+  S.step=n;
+  document.getElementById('step-upload').style.display  = n===1?'flex':'none';
+  document.getElementById('step-mapping').style.display = n===2?'flex':'none';
+  // step-preview는 absolute overlay — visible 클래스로 토글
+  const prev=document.getElementById('step-preview');
+  if(n===3){ prev.classList.add('visible'); }
+  else      { prev.classList.remove('visible'); }
+  document.getElementById('reset-btn').style.display = n===1?'none':'inline-block';
+  // stepper
+  const steps=[null,$('s1'),$('s2'),$('s3')];
+  const lines=[null,null,$('line1'),$('line2')];
+  for(let i=1;i<=3;i++){
+    steps[i].className='step '+(i<n?'done':i===n?'active':'');
+    steps[i].querySelector('.step-circle').textContent=i<n?'✓':String(i);
+  }
+  for(let i=2;i<=3;i++) lines[i].className='step-line '+(i<=n?'done':'');
+  if(n===2) renderMappingStep();
+  if(n===3) renderPreviewStep();
+}
+const $=id=>document.getElementById(id);
+
+function resetAll(){
+  S={wb:null,parsed:null,mapping:{},activeSec:'고객정보',mTargetId:null,mTempSel:[],step:1,fileType:'auto',colOrder:null,colWidths:{},openTempCols:[]};
+  $('fi').value='';
+  $('dz-content').style.display='block';
+  $('dz-loading').style.display='none';
+  $('sheet-box').style.display='none';
+  $('filetype-sel').value='auto';
+  $('hrow-sel').disabled=false;
+  $('filetype-hint').textContent='';
+  goStep(1);
+}
+function resetUpload(){
+  $('sheet-box').style.display='none';
+  $('dz-content').style.display='block';
+  $('fi').value=''; S.wb=null;
+}
+
+// ════════════════════════════════════════════════
+// 파일 파싱
+// ════════════════════════════════════════════════
+function onDrop(e){e.preventDefault();document.getElementById('dropzone').classList.remove('drag');onFile(e.dataTransfer.files[0]);}
+function onFile(file){
+  if(!file)return;
+  $('dz-content').style.display='none'; $('dz-loading').style.display='block';
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
+      S.wb=wb;
+      const sel=$('sheet-sel'); sel.innerHTML='';
+      wb.SheetNames.forEach(n=>{const o=document.createElement('option');o.value=o.textContent=n;sel.appendChild(o);});
+
+      // ── 업체 자동 감지 ──
+      const detected = detectVendor(wb, wb.SheetNames[0]);
+      const ftSel=$('filetype-sel');
+      ftSel.value = detected.type;
+      onFileTypeChange(); // 헤더 행·힌트 자동 설정
+
+      // 감지 결과 메시지 표시
+      const hint=$('filetype-hint');
+      if(detected.type !== 'auto'){
+        hint.innerHTML=`✅ <strong>${detected.label}</strong> 파일로 감지됨 &nbsp;<span style="color:#9ca3af;font-size:11px">아닌 경우 직접 변경하세요</span>`;
+        hint.style.color='#059669';
+      } else {
+        hint.textContent='파일 유형을 자동으로 감지하지 못했습니다. 직접 선택해 주세요.';
+        hint.style.color='#d97706';
+      }
+
+      $('dz-loading').style.display='none';
+      $('sheet-box').style.display='flex';
+    }catch(ex){showErr('파일 오류: '+ex.message);}
+  };
+  r.onerror=()=>showErr('파일 읽기 실패');
+  r.readAsBinaryString(file);
+}
+
+// ── 업체 파일 자동 감지 ──
+function detectVendor(wb, sheetName){
+  const allRows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:'',raw:false});
+  const getRow = (n) => (allRows[n]||[]).map(v=>String(v||'').replace(/\s|\n/g,'').toLowerCase());
+
+  const row1 = getRow(0);
+  const row2 = getRow(1);
+  const row3 = getRow(2);
+  const row4 = getRow(3);
+
+  const has = (rowArr, ...keywords) => keywords.every(k => rowArr.some(v=>v.includes(k.toLowerCase())));
+  const hasAny = (rowArr, ...keywords) => keywords.some(k => rowArr.some(v=>v.includes(k.toLowerCase())));
+
+  // 사이버윈: 1행에 '수용가현황', 4행에 '수용가명'
+  if(has(row1,'수용가현황') || (has(row4,'수용가명') && has(row4,'수용가주소'))){
+    return {type:'cyberwin', label:'사이버윈'};
+  }
+
+  // 빅쓰리: 1행에 '기본사항'+'협회신고', 2행에 '상호(협회)'
+  if((has(row1,'기본사항') && hasAny(row1,'협회신고','cms')) || has(row2,'상호(협회)','상호(세금계산서)')){
+    return {type:'bigthree', label:'빅쓰리'};
+  }
+
+  // 일렉인: 1행에 '수용가id' 또는 '선임자(협회)' 또는 '수용가명'+'담당자(개인)'
+  if(hasAny(row1,'수용가id','선임자(협회)') || (has(row1,'수용가명') && has(row1,'담당자(개인)'))){
+    return {type:'elecin', label:'일렉인'};
+  }
+
+  // TNB소프트: 1행에 TNB 고유 컬럼명 (계산서상호, VAT이부, 수금경로, 고객번호 등)
+  const tnbKeywords = ['계산서상호','vat이부','수금경로','고객번호','계산서우편번호','태양전압','태양용량','선임자'];
+  const tnbHits = tnbKeywords.filter(k=>row1.some(v=>v.includes(k)));
+  if(tnbHits.length >= 2){
+    return {type:'tnb', label:'TNB소프트'};
+  }
+
+  return {type:'auto', label:''};
+}
+function autoDetectHdr(wb,sn){
+  const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:'',raw:false});
+  let best=0,bScore=0;
+  for(let i=0;i<Math.min(5,rows.length);i++){
+    const sc=rows[i].filter(c=>{const s=String(c||'').trim();return s.length>0&&isNaN(Number(s));}).length;
+    if(sc>bScore){bScore=sc;best=i;}
+  }
+  return best;
+}
+// 파일 유형별 고정 헤더 행 (0-based)
+const VENDOR_HEADER_ROW = { tnb:0, cyberwin:3, bigthree:1, elecin:0, auto:null };
+const VENDOR_LABEL = { tnb:'TNB소프트 (1행 헤더)', cyberwin:'사이버윈 (4행 헤더)', bigthree:'빅쓰리 (2행 헤더)', elecin:'일렉인 (1행 헤더)', auto:'' };
+
+function onFileTypeChange(fromUser){
+  const v=$('filetype-sel').value;
+  const hint=$('filetype-hint');
+  const fixedRow = VENDOR_HEADER_ROW[v];
+
+  if(v==='auto'){
+    if(fromUser){ hint.textContent=''; hint.style.color=''; }
+    $('hrow-sel').disabled=false;
+    $('hrow-hint').textContent='자동 감지됨. 이상하면 수동 변경';
+  } else {
+    $('hrow-sel').value=String(fixedRow);
+    $('hrow-sel').disabled=true;
+    $('hrow-hint').textContent='📌 '+VENDOR_LABEL[v]+' 고정값';
+    // 사용자가 직접 변경한 경우만 힌트 덮어씀
+    if(fromUser){
+      hint.innerHTML=`✅ <strong>${VENDOR_LABEL[v].split(' ')[0]}</strong> 템플릿이 적용됩니다`;
+      hint.style.color='#059669';
+    }
+  }
+}
+
+// 드롭다운 onchange는 사용자 직접 변경 (fromUser=true)
+document.addEventListener('DOMContentLoaded',()=>{
+  $('filetype-sel').addEventListener('change',()=>onFileTypeChange(true));
+});
+
+function confirmSheet(){
+  const sn=$('sheet-sel').value;
+  const fileType=$('filetype-sel').value;
+  const fixedRow = VENDOR_HEADER_ROW[fileType];
+  const hi = (fixedRow !== null && fixedRow !== undefined) ? fixedRow : parseInt($('hrow-sel').value);
+  const p=parseSheet(S.wb,sn,hi);
+  if(!p.cols.length){showErr('컬럼을 찾을 수 없습니다. 헤더 행을 변경해 보세요.');return;}
+  S.parsed=p; S.fileType=fileType;
+  const TEMPLATE_FN={
+    tnb:   (cols)=>applyTNBTemplate(cols),
+    cyberwin: ()=>applyCyberwinTemplate(),
+    bigthree: ()=>applyBigthreeTemplate(),
+    elecin:   ()=>applyElecInTemplate(),
+  };
+  S.mapping = TEMPLATE_FN[fileType] ? TEMPLATE_FN[fileType](p.cols) : buildAutoMap(p.cols);
+  S.activeSec='고객정보';
+  S.colOrder=[...A_COLS.map(c=>c.id)];
+  S.colWidths={};
+  goStep(2);
+}
+
+// ════════════════════════════════════════════════
+// TNB소프트 매핑 템플릿
+// 스크린샷 확인 결과 기반으로 정확히 하드코딩
+// ════════════════════════════════════════════════
+// TNB 원본 컬럼명 → A양식 targetId 매핑표
+const TNB_MAP = [
+  // ── 고객정보 ──
+  { tnbCol:'고객번호',       targetId:'cust_mgmt_code' },
+  { tnbCol:'계산서상호',     targetId:'cust_name' },
+  { tnbCol:'사업자',         targetId:'cust_biz_no' },
+  { tnbCol:'대표자명',       targetId:'cust_ceo' },
+  { tnbCol:'계산서우편번호', targetId:'cust_zip' },           // ★ 추가
+  { tnbCol:'계산서주소',     targetId:'cust_addr1' },
+  { tnbCol:'계산서주소2',    targetId:'cust_addr2' },
+  { tnbCol:'연락처',         targetId:'cust_tel' },
+  { tnbCol:'E-MAIL',         targetId:'cust_email' },
+
+  // ── 점검건물정보 ──
+  { tnbCol:'고객(상호)명',   targetId:'bldg_name' },          // 점검건물명 ← 고객(상호)명
+  { tnbCol:'계산서상호',     targetId:'bldg_biz_name' },      // ★ 수정 (계산서상호)
+  { tnbCol:'사업자',         targetId:'bldg_biz_no' },
+  { tnbCol:'대표자명',       targetId:'bldg_ceo' },
+  { tnbCol:'설치우편번호',   targetId:'bldg_zip' },           // ★ 추가
+  { tnbCol:'설치주소1',      targetId:'bldg_addr1' },         // ★ 수정 (설치주소1)
+  { tnbCol:'설치주소2',      targetId:'bldg_addr2' },         // ★ 수정 (설치주소2)
+  { tnbCol:'청구지우편',     targetId:'bldg_mail_zip' },
+  { tnbCol:'청구지주소1',    targetId:'bldg_mail_addr1' },
+  { tnbCol:'청구지주소2',    targetId:'bldg_mail_addr2' },
+  { tnbCol:'회계담당자',     targetId:'bldg_rcv_name' },
+  { tnbCol:'회계연락처',     targetId:'bldg_rcv_tel' },
+  { tnbCol:'업태',           targetId:'bldg_biz_type' },
+  { tnbCol:'업종',           targetId:'bldg_biz_item' },      // ★ 수정 (업종)
+  { tnbCol:'건물용도',       targetId:'bldg_usage' },
+
+  // ── 계약정보 ──
+  { tnbCol:'총설비용량',     targetId:'cont_capacity' },
+  { tnbCol:'수전전압',       targetId:'cont_recv_volt' },
+  { tnbCol:'수전용량',       targetId:'cont_recv_cap' },
+  { tnbCol:'발전전압',       targetId:'cont_gen_volt' },
+  { tnbCol:'발전용량',       targetId:'cont_gen_cap' },
+  { tnbCol:'태양전압',       targetId:'cont_solar_volt' },    // ★ 수정 (태양전압)
+  { tnbCol:'태양용량',       targetId:'cont_solar_cap' },     // ★ 수정 (태양용량)
+  { tnbCol:'가중치',         targetId:'cont_score' },
+  { tnbCol:'점검횟수',       targetId:'cont_insp_cnt' },
+  { tnbCol:'선임자',         targetId:'cont_inspector' },     // ★ 수정 (선임자)
+  { tnbCol:'영업자',         targetId:'cont_sales' },
+  { tnbCol:'고객상태',       targetId:'cont_status' },
+  { tnbCol:'계약일',         targetId:'cont_start_date' },
+  { tnbCol:'관리자연락처',   targetId:'cont_mgr_tel' },
+  { tnbCol:'회계담당자',     targetId:'cont_ctr_name' },
+  { tnbCol:'회계연락처',     targetId:'cont_ctr_tel' },
+  { tnbCol:'계산서E-mail',   targetId:'cont_ctr_email' },     // ★ 추가
+  { tnbCol:'팩스번호',       targetId:'cont_fax' },
+
+  // ── 청구정보 ──
+  { tnbCol:'월정료',         targetId:'bill_total' },
+  { tnbCol:'vat포함여부',    targetId:'bill_tax_type' },      // ★ 수정 (vat포함여부)
+  { tnbCol:'TAX발행',        targetId:'bill_invoice' },
+  { tnbCol:'수금경로',       targetId:'bill_type' },
+  { tnbCol:'TAX비고',        targetId:'bill_note' },
+  { tnbCol:'이체일',         targetId:'bill_date' },
+  { tnbCol:'납입구분',       targetId:'bill_due_month' },
+  { tnbCol:'납입기한',       targetId:'bill_due_day' },       // ★ 수정 (납입기한)
+  { tnbCol:'은행코드',       targetId:'bill_cms_bank' },
+  { tnbCol:'예금주',         targetId:'bill_cms_acct' },
+  { tnbCol:'고객메모',       targetId:'bill_note2' },
+];
+
+function applyTNBTemplate(parsedCols){
+  const mapping={};
+
+  // 1:N을 지원하기 위해 targetId별로 여러 sourceIdx를 누적
+  // TNB_MAP을 순회하면서 실제 파일 컬럼과 매칭
+  const accumulated={}; // targetId -> Set of idx
+
+  for(const rule of TNB_MAP){
+    // 1순위: 완전 일치
+    let found = parsedCols.find(c=>c.name.trim()===rule.tnbCol);
+    // 2순위: 공백·괄호 제거 후 일치
+    if(!found){
+      const normRule = rule.tnbCol.replace(/\s/g,'').toLowerCase();
+      found = parsedCols.find(c=>c.name.replace(/\s/g,'').toLowerCase()===normRule);
+    }
+    // 3순위: 포함 관계 (짧은 쪽이 긴 쪽에 포함될 때)
+    if(!found) found = parsedCols.find(c=>c.name.includes(rule.tnbCol)||rule.tnbCol.includes(c.name));
+    if(!found) continue;
+
+    if(!accumulated[rule.targetId]) accumulated[rule.targetId]=new Set();
+    accumulated[rule.targetId].add(found.idx);
+  }
+
+  // mapping 객체 생성
+  for(const [targetId, idxSet] of Object.entries(accumulated)){
+    mapping[targetId]={idxs:[...idxSet], conf:1.0, manual:false, template:'TNB소프트'};
+  }
+
+  return mapping;
+}
+
+// ════════════════════════════════════════════════
+// 사이버윈 매핑 템플릿 (4행 헤더 → 헤더행idx=3)
+// 지킴E 열위치(0-based) → 사이버윈 열위치(0-based)
+// ════════════════════════════════════════════════
+const CYBERWIN_IDX_MAP = [
+  // 지킴E targetId          사이버윈 열idx(0-based)
+  {id:'cust_mgmt_code',       srcIdx:[1]},    // b  업체관리코드 ← 코드
+  {id:'cust_name',            srcIdx:[24]},   // y  고객(사업자)명
+  {id:'cust_biz_no',         srcIdx:[25]},   // z  사업자번호
+  {id:'cust_ceo',            srcIdx:[26]},   // aa 대표자
+  {id:'cust_addr1',          srcIdx:[29]},   // ad 기본주소(고객)
+  {id:'bldg_name',           srcIdx:[2]},    // c  점검건물명
+  {id:'bldg_biz_name',       srcIdx:[24]},   // y  사업자(계약)명
+  {id:'bldg_biz_no',         srcIdx:[25]},   // z  건물 사업자번호
+  {id:'bldg_ceo',            srcIdx:[26]},   // aa 건물 대표자
+  {id:'bldg_addr1',          srcIdx:[3]},    // d  건물 기본주소
+  {id:'bldg_mail_addr1',     srcIdx:[38]},   // am 기본주소(수령지)
+  {id:'bldg_rcv_name',       srcIdx:[39]},   // an 수신자
+  {id:'bldg_rcv_tel',        srcIdx:[40]},   // ao 수신자 연락처
+  {id:'bldg_biz_type',       srcIdx:[27]},   // ab 업태
+  {id:'bldg_biz_item',       srcIdx:[28]},   // ac 종목
+  {id:'cont_capacity',       srcIdx:[4]},    // e  계약용량
+  {id:'cont_volt_type',      srcIdx:[8]},    // i  전압형태
+  {id:'cont_recv_volt',      srcIdx:[14]},   // o  수전전압(V)
+  {id:'cont_recv_cap',       srcIdx:[5]},    // f  수전용량
+  {id:'cont_gen_volt',       srcIdx:[15]},   // p  발전전압
+  {id:'cont_gen_cap',        srcIdx:[6]},    // g  발전용량
+  {id:'cont_solar_cap',      srcIdx:[7]},    // h  태양광용량
+  {id:'cont_score',          srcIdx:[9]},    // j  관리점수(가중치)
+  {id:'cont_insp_cnt',       srcIdx:[10]},   // k  월점검횟수
+  {id:'cont_inspector',      srcIdx:[12]},   // m  점검자
+  {id:'cont_inspector2',     srcIdx:[11]},   // l  2ND
+  {id:'cont_sales',          srcIdx:[13]},   // n  영업자
+  {id:'cont_status',         srcIdx:[33]},   // ah 계약진행상태
+  {id:'cont_start_date',     srcIdx:[30]},   // ae 계약일
+  {id:'cont_end_date',       srcIdx:[31]},   // af 계약만료일
+  {id:'cont_insp_cycle',     srcIdx:[17]},   // r  정기점검 주기(년)
+  {id:'cont_last_insp',      srcIdx:[18]},   // s  최종검사일
+  {id:'cont_mgr_name',       srcIdx:[21]},   // v  관리담당자
+  {id:'cont_mgr_tel',        srcIdx:[22]},   // w  관리담당자 연락처
+  {id:'cont_mgr_email',      srcIdx:[23]},   // x  관리담당자 Email
+  {id:'cont_ctr_name',       srcIdx:[56]},   // be 계약담당자
+  {id:'cont_ctr_tel',        srcIdx:[59]},   // bh 계약담당자 연락처
+  {id:'cont_ctr_email',      srcIdx:[58]},   // bg 계약담당자 Email
+  {id:'cont_fax',            srcIdx:[61]},   // bj Fax No.
+  {id:'bill_supply',         srcIdx:[42]},   // aq 공급가액
+  {id:'bill_vat',            srcIdx:[43]},   // ar 부가세
+  {id:'bill_invoice',        srcIdx:[54]},   // bc 계산서발행
+  {id:'bill_type',           srcIdx:[45]},   // at 청구형태
+  {id:'bill_note',           srcIdx:[63]},   // bl 계산서 비고
+  {id:'bill_date',           srcIdx:[44]},   // as 청구일
+  {id:'bill_due_month',      srcIdx:[46]},   // au 납부기한월
+  {id:'bill_due_day',        srcIdx:[46]},   // au 납부기한일
+  {id:'bill_cms_payer',      srcIdx:[48]},   // aw CMS납부자번호
+  {id:'bill_cms_bank',       srcIdx:[49]},   // ax CMS출금은행
+  {id:'bill_cms_acct',       srcIdx:[50]},   // ay CMS출금계좌
+  {id:'bill_cms_id',         srcIdx:[51]},   // az CMS실명확인번호
+  {id:'bill_note2',          srcIdx:[35]},   // aj 특이사항
+];
+function applyCyberwinTemplate(cols){ return buildIdxMapping(CYBERWIN_IDX_MAP,'사이버윈'); }
+
+// ════════════════════════════════════════════════
+// 빅쓰리 매핑 템플릿 (5행 헤더 → 헤더행idx=4)
+// ════════════════════════════════════════════════
+const BIGTHREE_IDX_MAP = [
+  {id:'cust_mgmt_code',       srcIdx:[0]},    // a  업체관리코드 ← 코드
+  {id:'cust_name',            srcIdx:[2]},    // c  고객(사업자)명
+  {id:'cust_biz_no',         srcIdx:[14]},   // o  사업자번호
+  {id:'cust_ceo',            srcIdx:[15]},   // p  대표자
+  {id:'cust_addr1',          srcIdx:[48]},   // aw 기본주소(고객)
+  {id:'cust_addr2',          srcIdx:[49]},   // ax 상세주소(고객)
+  {id:'cust_tel',            srcIdx:[17]},   // r  대표연락처
+  {id:'bldg_name',           srcIdx:[1]},    // b  점검건물명
+  {id:'bldg_biz_name',       srcIdx:[45]},   // at 사업자(계약)명
+  {id:'bldg_biz_no',         srcIdx:[46]},   // au 건물 사업자번호
+  {id:'bldg_ceo',            srcIdx:[47]},   // av 건물 대표자
+  {id:'bldg_addr1',          srcIdx:[16]},   // q  건물 기본주소
+  {id:'bldg_mail_zip',       srcIdx:[59]},   // bh 우편번호(수령지)
+  {id:'bldg_mail_addr1',     srcIdx:[60]},   // bi 기본주소(수령지)
+  {id:'bldg_mail_addr2',     srcIdx:[61]},   // bj 상세주소(수령지)
+  {id:'bldg_rcv_name',       srcIdx:[58]},   // bg 수신자
+  {id:'bldg_rcv_tel',        srcIdx:[62]},   // bk 수신자 연락처
+  {id:'bldg_biz_type',       srcIdx:[50]},   // ay 업태
+  {id:'bldg_biz_item',       srcIdx:[51]},   // az 종목
+  {id:'cont_capacity',       srcIdx:[4]},    // e  계약용량
+  {id:'cont_volt_type',      srcIdx:[23]},   // x  전압형태
+  {id:'cont_recv_volt',      srcIdx:[24]},   // y  수전전압(V)
+  {id:'cont_recv_cap',       srcIdx:[25]},   // z  수전용량
+  {id:'cont_gen_volt',       srcIdx:[28]},   // ac 발전전압
+  {id:'cont_gen_cap',        srcIdx:[29]},   // ad 발전용량
+  {id:'cont_solar_volt',     srcIdx:[30]},   // ae 태양광전압
+  {id:'cont_solar_cap',      srcIdx:[31]},   // af 태양광용량
+  {id:'cont_score',          srcIdx:[3]},    // d  관리점수(가중치)
+  {id:'cont_insp_cnt',       srcIdx:[36]},   // ak 월점검횟수
+  {id:'cont_inspector',      srcIdx:[7]},    // h  점검자
+  {id:'cont_inspector2',     srcIdx:[6]},    // g  2ND
+  {id:'cont_sales',          srcIdx:[5]},    // f  영업자
+  {id:'cont_status',         srcIdx:[20]},   // u  계약진행상태
+  {id:'cont_start_date',     srcIdx:[9]},    // j  계약일
+  {id:'cont_end_date',       srcIdx:[11]},   // l  계약만료일
+  {id:'cont_insp_cycle',     srcIdx:[38]},   // am 정기점검 주기(년)
+  {id:'cont_last_insp',      srcIdx:[39]},   // an 최종검사일
+  {id:'cont_mgr_name',       srcIdx:[83]},   // cf 관리담당자
+  {id:'cont_mgr_tel',        srcIdx:[84]},   // cg 관리담당자 연락처
+  {id:'cont_ctr_name',       srcIdx:[52]},   // ba 계약담당자
+  {id:'cont_ctr_tel',        srcIdx:[53]},   // bb 계약담당자 연락처
+  {id:'cont_ctr_email',      srcIdx:[54]},   // bc 계약담당자 Email
+  {id:'bill_supply',         srcIdx:[65]},   // bn 공급가액(계약금액)
+  {id:'bill_vat',            srcIdx:[66]},   // bo 부가세 (별도 열)
+  {id:'bill_tax_type',       srcIdx:[56]},   // be 과세유형
+  {id:'bill_invoice',        srcIdx:[70]},   // bs 계산서발행
+  {id:'bill_type',           srcIdx:[71]},   // bt 청구형태
+  {id:'bill_receipt',        srcIdx:[68]},   // bq 청구/영수
+  {id:'bill_date',           srcIdx:[78]},   // ca 청구일
+  {id:'bill_due_month',      srcIdx:[75]},   // bx 납부기한월
+  {id:'bill_due_day',        srcIdx:[76]},   // by 납부기한일
+];
+function applyBigthreeTemplate(cols){ return buildIdxMapping(BIGTHREE_IDX_MAP,'빅쓰리'); }
+
+// ════════════════════════════════════════════════
+// 일렉인 매핑 템플릿 (6행 헤더 → 헤더행idx=5)
+// ════════════════════════════════════════════════
+const ELECIN_IDX_MAP = [
+  {id:'cust_mgmt_code',       srcIdx:[4]},    // e  업체관리코드 ← 수용가ID
+  {id:'cust_name',            srcIdx:[16]},   // q  고객(사업자)명
+  {id:'cust_biz_no',         srcIdx:[8]},    // i  사업자번호
+  {id:'cust_ceo',            srcIdx:[9]},    // j  대표자
+  {id:'cust_zip',            srcIdx:[22]},   // w  우편번호(고객)
+  {id:'cust_addr1',          srcIdx:[28]},   // ac 기본주소(고객)
+  {id:'cust_tel',            srcIdx:[12]},   // m  대표연락처
+  {id:'bldg_name',           srcIdx:[1]},    // b  점검건물명
+  {id:'bldg_biz_name',       srcIdx:[16]},   // q  사업자(계약)명
+  {id:'bldg_biz_no',         srcIdx:[18]},   // s  건물 사업자번호
+  {id:'bldg_ceo',            srcIdx:[19]},   // t  건물 대표자
+  {id:'bldg_zip',            srcIdx:[51]},   // az 건물 우편번호
+  {id:'bldg_addr1',          srcIdx:[52]},   // ba 건물 기본주소
+  {id:'bldg_mail_zip',       srcIdx:[32]},   // ag 우편번호(수령지)
+  {id:'bldg_mail_addr1',     srcIdx:[34]},   // ai 기본주소(수령지)
+  {id:'bldg_mail_addr2',     srcIdx:[30]},   // ae 상세주소(수령지)
+  {id:'bldg_rcv_name',       srcIdx:[31]},   // af 수신자
+  {id:'bldg_biz_type',       srcIdx:[20]},   // u  업태
+  {id:'bldg_biz_item',       srcIdx:[21]},   // v  종목
+  {id:'cont_type',           srcIdx:[6]},    // g  계약형태
+  {id:'cont_recv_volt',      srcIdx:[35]},   // aj 수전전압(V)
+  {id:'cont_recv_cap',       srcIdx:[33]},   // ah 수전용량
+  {id:'cont_gen_volt',       srcIdx:[39,41]},// an,ap 발전전압
+  {id:'cont_gen_cap',        srcIdx:[37,40]},// al,ao 발전용량
+  {id:'cont_solar_volt',     srcIdx:[43]},   // ar 태양광전압
+  {id:'cont_solar_cap',      srcIdx:[42]},   // aq 태양광용량
+  {id:'cont_score',          srcIdx:[63]},   // bl 관리점수(가중치)
+  {id:'cont_insp_cnt',       srcIdx:[94]},   // cq 월점검횟수
+  {id:'cont_inspector',      srcIdx:[3]},    // d  점검자
+  {id:'cont_inspector2',     srcIdx:[93]},   // cp 2ND
+  {id:'cont_sales',          srcIdx:[2]},    // c  영업자
+  {id:'cont_status',         srcIdx:[83]},   // cf 계약진행상태
+  {id:'cont_start_date',     srcIdx:[10]},   // k  계약일
+  {id:'cont_end_date',       srcIdx:[11]},   // l  계약만료일
+  {id:'cont_kepco_mgmt',     srcIdx:[95]},   // cr 수용가 관리번호
+  {id:'cont_kepco_cust',     srcIdx:[53]},   // bb 한전 고객번호
+  {id:'cont_safety_no',      srcIdx:[57]},   // bf 안전공사 고객번호
+  {id:'cont_insp_cycle',     srcIdx:[67]},   // bp 정기점검 주기(년)
+  {id:'cont_last_insp',      srcIdx:[65]},   // bn 최종검사일
+  {id:'cont_mgr_name',       srcIdx:[59]},   // bh 관리담당자
+  {id:'cont_mgr_tel',        srcIdx:[60]},   // bi 관리담당자 연락처
+  {id:'cont_mgr_email',      srcIdx:[61]},   // bj 관리담당자 Email
+  {id:'cont_ctr_name',       srcIdx:[76]},   // by 계약담당자
+  {id:'cont_ctr_tel',        srcIdx:[77]},   // bz 계약담당자 연락처
+  {id:'cont_ctr_email',      srcIdx:[29]},   // ad 계약담당자 Email
+  {id:'bill_total',          srcIdx:[70]},   // bs 계약총액 ← 수수료 (공급가액X)
+  // bill_supply, bill_vat는 transform에서 자동계산
+  {id:'bill_tax_type',       srcIdx:[79]},   // cb 과세유형
+  {id:'bill_invoice',        srcIdx:[69]},   // br 계산서발행(발행구분)
+  {id:'bill_type',           srcIdx:[71]},   // bt 청구형태(지로발행) — transform에서 재계산
+  {id:'bill_note',           srcIdx:[25]},   // z  계산서 비고
+  {id:'bill_receipt',        srcIdx:[24]},   // y  청구/영수
+  {id:'bill_date',           srcIdx:[74]},   // bw 청구일
+  {id:'bill_cms_payer',      srcIdx:[7]},    // h  CMS납부자번호
+  // cont_capacity: 합계용량(idx=46)
+  {id:'cont_capacity',       srcIdx:[46]},   // au 합계용량
+];
+function applyElecInTemplate(cols){ return buildIdxMapping(ELECIN_IDX_MAP,'일렉인'); }
+
+// ── 인덱스 기반 공통 템플릿 매핑 빌더 ──
+// 컬럼명이 아닌 열 번호(0-based)로 직접 매핑 → 정확도 100%
+function buildIdxMapping(idxMap, templateName){
+  const mapping={};
+  for(const rule of idxMap){
+    mapping[rule.id]={idxs:rule.srcIdx, conf:1.0, manual:false, template:templateName};
+  }
+  return mapping;
+}
+function parseSheet(wb,sn,hi){
+  const all=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:'',raw:false});
+  if(!all.length) return{cols:[],rows:[],sn,hi};
+  const hrow=all[hi]||[];
+  const drows=all.slice(hi+1);
+  const cols=[];
+  hrow.forEach((name,idx)=>{
+    const n=String(name||'').trim(); if(!n)return;
+    const samps=drows.slice(0,10).map(r=>String(r[idx]||'').trim()).filter(Boolean);
+    cols.push({name:n,idx,samps,pat:detectPat(samps)});
+  });
+  const rows=drows.map(r=>hrow.map((_,i)=>String(r[i]||'').trim()));
+  return{cols,rows,sn,hi};
+}
+function detectPat(s){
+  if(!s.length)return'text';
+  const chk=re=>s.filter(v=>re.test(v.trim())).length/s.length;
+  if(chk(/^\d{3}-?\d{2}-?\d{5}$/)>.5)return'business_number';
+  if(chk(/^(0\d{1,2}[-.\s]?\d{3,4}[-.\s]?\d{4}|01[0-9]-?\d{3,4}-?\d{4})$/)>.5)return'phone';
+  if(chk(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)>.5)return'email';
+  if(chk(/^\d{4}[-./]\d{1,2}[-./]\d{1,2}$|^\d{4}\d{2}\d{2}$/)>.5)return'date';
+  if(chk(/^\d+(\.\d+)?$/)>.7)return'number';
+  return'text';
+}
+
+// ════════════════════════════════════════════════
+// 자동 매핑
+// ════════════════════════════════════════════════
+function norm(s){return s.toLowerCase().replace(/\s+/g,'').replace(/[_\-()（）\[\]]/g,'').replace(/번호$/,'').replace(/정보$/,'');}
+function sim(a,b){
+  const na=norm(a),nb=norm(b);
+  if(na===nb)return 1; if(na.includes(nb)||nb.includes(na))return.8;
+  const bg=s=>{const t=new Set();for(let i=0;i<s.length-1;i++)t.add(s.slice(i,i+2));return t;};
+  const ba=bg(na),bb=bg(nb);
+  const inter=[...ba].filter(x=>bb.has(x)).length;
+  const un=new Set([...ba,...bb]).size;
+  return un?inter/un:0;
+}
+function buildAutoMap(cols){
+  const m={};
+  for(const t of A_COLS){
+    let bScore=0,bIdx=-1;
+    const syns=SYNONYMS[t.id]||[];
+    for(const c of cols){
+      let score=0;
+      const nc=norm(c.name);
+      if(nc===norm(t.name))score=1;
+      else if(syns.some(s=>norm(s)===nc))score=.95;
+      else{score=Math.max(sim(c.name,t.name),...syns.map(s=>sim(c.name,s)));
+        if(c.pat&&PHINTS[c.pat]?.includes(t.id))score+=.1;}
+      if(score>bScore){bScore=score;bIdx=c.idx;}
+    }
+    if(bScore>=.4&&bIdx>=0) m[t.id]={idxs:[bIdx],conf:Math.min(bScore,1),manual:false};
+  }
+  if(m['cust_biz_no']&&!m['bldg_biz_no'])
+    m['bldg_biz_no']={...m['cust_biz_no'],conf:m['cust_biz_no'].conf*.7,manual:false};
+  return m;
+}
+
+// ════════════════════════════════════════════════
+// STEP2: 엑셀형 스프레드시트 렌더링
+// ════════════════════════════════════════════════
+const PAT_ICON={business_number:'🏢',phone:'📞',email:'✉️',date:'📅',number:'#',text:'T'};
+
+function renderMappingStep(){
+  const tmpl=getTemplateName();
+  const badge=$('tb-template-badge');
+  if(tmpl){
+    badge.style.display='block';
+    badge.textContent='🏢 '+tmpl+' 템플릿 적용됨';
+  } else {
+    badge.style.display='none';
+  }
+  renderSecTabs();
+  renderSpreadsheet();
+  renderUnmatchedTray();
+  updateStat();
+}
+
+function renderSecTabs(){
+  const el=$('section-tabs'); el.innerHTML='';
+  SECTIONS.forEach(sec=>{
+    const cols=A_COLS.filter(c=>c.sec===sec);
+    const mapped=cols.filter(c=>S.mapping[c.id]?.idxs.length).length;
+    const allDone=mapped===cols.length;
+    const btn=document.createElement('button');
+    btn.className='sec-tab'+(sec===S.activeSec?' active':'')+(allDone?' sec-done':'');
+    btn.innerHTML=`${sec}<span class="sec-badge">${mapped}/${cols.length}</span>`;
+    btn.onclick=()=>{S.activeSec=sec;renderSecTabs();renderSpreadsheet();renderUnmatchedTray();};
+    el.appendChild(btn);
+  });
+}
+
+function renderSpreadsheet(){
+  // 현재 섹션의 컬럼을 colOrder 순서 기준으로 정렬
+  const secColIds = A_COLS.filter(c=>c.sec===S.activeSec).map(c=>c.id);
+  // colOrder에서 현재 섹션 컬럼만 추출 (순서 유지)
+  const orderedIds = (S.colOrder||secColIds).filter(id=>secColIds.includes(id));
+  // colOrder에 없는 것은 뒤에 추가
+  secColIds.forEach(id=>{ if(!orderedIds.includes(id)) orderedIds.push(id); });
+  const cols = orderedIds.map(id=>A_COLS.find(c=>c.id===id)).filter(Boolean);
+
+  const rows=S.parsed.rows;
+  const SHOW=Math.min(rows.length,50);
+  const tnb=isTNBMode();
+  const tmpl=getTemplateName();
+  const autoCalcIds=['cont_type','cont_volt_type','bill_invoice','bill_tax_type','bill_supply','bill_vat'];
+
+  // 컬럼 너비 (기본 130px)
+  const getW=id=>(S.colWidths&&S.colWidths[id])||130;
+
+  // ── 1행: A양식 컬럼명 헤더 (드래그+리사이즈) ──
+  let thead=`<tr class="row-a-header">
+    <th class="rn-cell" style="position:sticky;top:0;left:0;z-index:20;width:36px;min-width:36px">행</th>`;
+  cols.forEach(col=>{
+    const isMapped=S.mapping[col.id]?.idxs.length>0;
+    const w=getW(col.id);
+    thead+=`<th data-col-id="${col.id}"
+      style="width:${w}px;min-width:60px;position:relative;${isMapped?'background:#14532d;':''}${col.req?'border-bottom:2px solid #f87171;':''}"
+      draggable="true"
+      ondragstart="colDragStart(event,'${col.id}')"
+      ondragover="colDragOver(event,'${col.id}')"
+      ondragleave="colDragLeave(event)"
+      ondrop="colDrop(event,'${col.id}')"
+      ondragend="colDragEnd(event)"
+      title="드래그: 열 이동 | 우측 경계선 드래그: 너비 조절">
+      <span style="overflow:hidden;text-overflow:ellipsis;display:block">${esc(col.name)}${col.req?'<span class="required-dot">*</span>':''}</span>
+      <div class="resize-handle" onmousedown="resizeStart(event,'${col.id}')"></div>
+    </th>`;
+  });
+  thead+='</tr>';
+
+  // ── 2행: 원본(B파일) 컬럼명 행 ──
+  thead+=`<tr class="row-b-header">
+    <td class="rn-cell" style="position:sticky;top:33px;left:0;z-index:20;font-size:10px;color:#475569;width:36px">원본↓</td>`;
+  cols.forEach(col=>{
+    const entry=S.mapping[col.id];
+    const srcCols=(entry?.idxs||[]).map(i=>S.parsed.cols.find(c=>c.idx===i)).filter(Boolean);
+    const w=getW(col.id);
+    let inner='';
+    if(srcCols.length===0){
+      if(tnb && autoCalcIds.includes(col.id)){
+        inner=`<div class="b-col-name" style="color:#c4b5fd"><span>🔄 자동계산</span></div>`;
+      } else {
+        inner=`<div class="b-col-name b-unmapped"><span>— 클릭하여 연결</span><span class="b-edit-btn">✏️</span></div>`;
+      }
+    } else if(srcCols.length===1){
+      const sc=srcCols[0];
+      const pct=Math.round((entry.conf||0)*100);
+      const tLabel=entry.template||'';
+      const confBadge=tLabel
+        ?`<span class="b-conf" style="background:#16533320;color:#86efac">${tLabel.slice(0,3)}</span>`
+        :`<span class="b-conf" style="background:${pct>=80?'#86efac':pct>=50?'#fde68a':'#fca5a5'}20;color:${pct>=80?'#86efac':pct>=50?'#fde68a':'#fca5a5'}">${pct}%</span>`;
+      inner=`<div class="b-col-name"><span title="${esc(sc.name)}">${PAT_ICON[sc.pat]||''} ${esc(sc.name)}</span>${confBadge}<span class="b-edit-btn">✏️</span></div>`;
+    } else {
+      inner=`<div class="multi-tag">${srcCols.map(sc=>`<div class="multi-chip">${PAT_ICON[sc.pat]||''} ${esc(sc.name)}</div>`).join('')}</div><span class="b-edit-btn" style="opacity:.7">✏️</span>`;
+    }
+    // B헤더 td: 클릭=모달, 드래그=다른 target으로 재매핑
+    if(srcCols.length===0){
+      // 매핑 없음 - 드래그 불가, 클릭으로 연결
+      thead+=`<td onclick="openModal('${col.id}')" style="width:${w}px;min-width:60px" title="클릭하여 매핑 수정">${inner}</td>`;
+    } else {
+      // 매핑 있음 - 드래그로 다른 target에 이동 가능 (1:N 추가)
+      // 각 sourceIdx를 드래그 소스로 제공 (첫 번째 srcCol 기준)
+      const dragIdx=srcCols[0].idx;
+      const dragName=srcCols[0].name;
+      thead+=`<td
+        onclick="openModal('${col.id}')"
+        draggable="true"
+        ondragstart="bHeaderDragStart(event,${dragIdx},'${dragName.replace(/'/g,"\\'")}','${col.id}')"
+        ondragend="tempColDragEnd(event)"
+        style="width:${w}px;min-width:60px;cursor:grab"
+        title="드래그: 다른 열로 이동 | 클릭: 매핑 수정">${inner}</td>`;
+    }
+  });
+  thead+='</tr>';
+  $('sheet-thead').innerHTML=thead;
+
+  // ── 3행~: 데이터 ──
+  const tmplName=getTemplateName();
+  let tbody='';
+  if(SHOW===0){
+    tbody=`<tr><td class="rn-cell">-</td><td colspan="${cols.length}" style="padding:20px;text-align:center;color:#9ca3af">데이터 없음</td></tr>`;
+  } else {
+    for(let ri=0;ri<SHOW;ri++){
+      const raw=rows[ri];
+      const obj = applyVendorTransform(buildRowObj(raw), raw, tmplName);
+      tbody+=`<tr class="row-data"><td class="rn-cell">${ri+1}</td>`;
+      cols.forEach(col=>{
+        const entry=S.mapping[col.id];
+        const isMapped=entry&&entry.idxs.length>0;
+        const val=obj[col.id]||'';
+        const isComputed=!!tmplName&&val&&!isMapped;
+        const w=getW(col.id);
+        // 매핑된 셀: 드래그로 다른 열에 추가 매핑 가능
+        if(isMapped){
+          const dragIdx=entry.idxs[0];
+          const dragName=(S.parsed.cols.find(c=>c.idx===dragIdx)?.name||'').replace(/'/g,"\\'");
+          tbody+=`<td class="mapped-col ${val?'':'empty-val'} click-col"
+            onclick="openModal('${col.id}')"
+            draggable="true"
+            ondragstart="bHeaderDragStart(event,${dragIdx},'${dragName}','${col.id}')"
+            ondragend="tempColDragEnd(event)"
+            title="${esc(val)||'드래그: 다른 열로 이동'}"
+            style="width:${w}px;min-width:60px;cursor:grab;${isComputed?'color:#7c3aed;font-style:italic':''}"
+            >${esc(val)||''}</td>`;
+        } else {
+          tbody+=`<td class="${isComputed?'mapped-col':''} ${val?'':'empty-val'} click-col"
+            onclick="openModal('${col.id}')"
+            title="${esc(val)||'(매핑 없음)'}"
+            style="width:${w}px;min-width:60px;${isComputed?'color:#7c3aed;font-style:italic':''}"
+            >${esc(val)||''}</td>`;
+        }
+      });
+      tbody+='</tr>';
+    }
+  }
+  if(rows.length>50){
+    tbody+=`<tr><td class="rn-cell" style="color:#9ca3af">...</td>
+      <td colspan="${cols.length}" style="padding:8px 12px;color:#9ca3af;font-size:12px;background:#fafafa">
+        ▲ 상위 50행 표시 중 (전체 ${rows.length}행은 다운로드 후 확인)
+      </td></tr>`;
+  }
+  $('sheet-tbody').innerHTML=tbody;
+}
+
+// ════════════════════════════════════════════════
+// 컬럼 드래그 (열 순서 이동)
+// ════════════════════════════════════════════════
+let dragSrcId=null;
+function colDragStart(e,id){
+  dragSrcId=id;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed='move';
+}
+function colDragOver(e,id){
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.row-a-header th').forEach(th=>th.classList.remove('drag-over'));
+  if(id!==dragSrcId) e.currentTarget.classList.add('drag-over');
+}
+function colDragLeave(e){ e.currentTarget.classList.remove('drag-over'); }
+function colDrop(e,targetId){
+  e.preventDefault();
+  if(!dragSrcId||dragSrcId===targetId) return;
+  // colOrder에서 섹션 내 순서 재배치
+  const secColIds=A_COLS.filter(c=>c.sec===S.activeSec).map(c=>c.id);
+  let order=(S.colOrder||A_COLS.map(c=>c.id)).filter(id=>secColIds.includes(id));
+  const fi=order.indexOf(dragSrcId), ti=order.indexOf(targetId);
+  if(fi<0||ti<0) return;
+  order.splice(fi,1); order.splice(ti,0,dragSrcId);
+  // 전체 colOrder에서 이 섹션 부분만 교체
+  let full=S.colOrder||A_COLS.map(c=>c.id);
+  const before=full.filter(id=>!secColIds.includes(id)||A_COLS.find(c=>c.id===id)?.sec!==S.activeSec);
+  // 해당 섹션 컬럼을 새 순서로 삽입
+  const firstIdx=full.findIndex(id=>secColIds.includes(id));
+  full=full.filter(id=>!secColIds.includes(id));
+  full.splice(firstIdx<0?full.length:firstIdx,0,...order);
+  S.colOrder=full;
+  renderSpreadsheet();
+}
+function colDragEnd(e){
+  document.querySelectorAll('.row-a-header th').forEach(th=>{
+    th.classList.remove('dragging','drag-over');
+  });
+  dragSrcId=null;
+}
+
+// ════════════════════════════════════════════════
+// 컬럼 리사이즈 (너비 조절)
+// ════════════════════════════════════════════════
+let resizeState=null;
+function resizeStart(e,colId){
+  e.preventDefault(); e.stopPropagation();
+  const th=e.currentTarget.closest('th');
+  resizeState={colId, startX:e.clientX, startW:th.offsetWidth};
+  document.addEventListener('mousemove',resizeMove);
+  document.addEventListener('mouseup',resizeEnd);
+  e.currentTarget.classList.add('resizing');
+}
+function resizeMove(e){
+  if(!resizeState) return;
+  const dx=e.clientX-resizeState.startX;
+  const newW=Math.max(60,resizeState.startW+dx);
+  if(!S.colWidths) S.colWidths={};
+  S.colWidths[resizeState.colId]=newW;
+  // 실시간으로 해당 컬럼 모든 셀 너비 변경
+  const id=resizeState.colId;
+  document.querySelectorAll(`[data-col-id="${id}"], th[data-col-id="${id}"]`).forEach(el=>{
+    el.style.width=newW+'px'; el.style.minWidth='60px';
+  });
+  // tbody 셀도 순서로 찾아 변경
+  const thead=$('sheet-thead');
+  const ths=Array.from(thead.querySelectorAll('tr.row-a-header th'));
+  const colIdx=ths.findIndex(th=>th.dataset.colId===id);
+  if(colIdx>=0){
+    document.querySelectorAll('#sheet-tbody tr').forEach(tr=>{
+      const td=tr.cells[colIdx+1]; // +1 for rn-cell
+      if(td){td.style.width=newW+'px';td.style.minWidth='60px';}
+    });
+    // 2행도
+    const row2=thead.querySelector('tr.row-b-header');
+    if(row2&&row2.cells[colIdx+1]){
+      row2.cells[colIdx+1].style.width=newW+'px';
+    }
+  }
+}
+function resizeEnd(){
+  document.removeEventListener('mousemove',resizeMove);
+  document.removeEventListener('mouseup',resizeEnd);
+  document.querySelectorAll('.resize-handle').forEach(h=>h.classList.remove('resizing'));
+  resizeState=null;
+}
+
+function updateStat(){
+  const m=Object.values(S.mapping).filter(e=>e.idxs.length).length;
+  $('tb-stat').textContent=`${m} / ${A_COLS.length} 매핑`;
+  renderSecTabs();
+  renderUnmatchedTray();
+}
+
+// ════════════════════════════════════════════════
+// 모달
+// ════════════════════════════════════════════════
+function openModal(targetId){
+  const t=A_COLS.find(c=>c.id===targetId);
+  S.mTargetId=targetId;
+  S.mTempSel=[...(S.mapping[targetId]?.idxs||[])];
+  $('m-sec').textContent=t.sec;
+  $('m-title').textContent=t.name+(t.req?' *':'');
+  $('msearch').value='';
+  $('modal-overlay').classList.add('open');
+  renderMSel(); renderMList();
+  setTimeout(()=>$('msearch').focus(),50);
+}
+function closeModal(){$('modal-overlay').classList.remove('open');S.mTargetId=null;}
+function saveModal(){
+  const id=S.mTargetId; if(!id)return;
+  if(S.mTempSel.length===0) delete S.mapping[id];
+  else S.mapping[id]={idxs:[...S.mTempSel],conf:S.mapping[id]?.conf||.5,manual:true};
+  closeModal();
+  renderSpreadsheet();
+  renderUnmatchedTray(); // 매핑 해제 시 즉시 트레이에 복원
+  renderSecTabs();
+  updateStat();
+}
+function clearMSel(){S.mTempSel=[];renderMSel();renderMList();}
+function renderMSel(){
+  const box=$('msel-box');
+  if(!S.mTempSel.length){box.style.display='none';return;}
+  box.style.display='block';
+  $('msel-tags').innerHTML=S.mTempSel.map(idx=>{
+    const c=S.parsed.cols.find(c=>c.idx===idx);
+    return c?`<span class="mtag">${esc(c.name)}<button class="mtag-rm" onclick="toggleMItem(${idx})">✕</button></span>`:'';
+  }).join('');
+}
+function renderMList(){
+  const q=$('msearch').value.toLowerCase();
+  const cols=S.parsed.cols.filter(c=>!q||c.name.toLowerCase().includes(q));
+  $('mlist').innerHTML=cols.length===0
+    ?'<div style="padding:20px;text-align:center;color:#9ca3af">검색 결과 없음</div>'
+    :cols.map(c=>{
+      const sel=S.mTempSel.includes(c.idx);
+      return`<div class="mitem ${sel?'sel':''}" onclick="toggleMItem(${c.idx})">
+        <div class="mchk">${sel?'☑':'☐'}</div>
+        <div style="overflow:hidden">
+          <div class="mitem-name">${PAT_ICON[c.pat]||''} ${esc(c.name)}</div>
+          <div class="mitem-samples">${c.samps.slice(0,4).join(' / ')||'(샘플 없음)'}</div>
+        </div>
+      </div>`;}).join('');
+}
+function toggleMItem(idx){
+  const i=S.mTempSel.indexOf(idx);
+  i>=0?S.mTempSel.splice(i,1):S.mTempSel.push(idx);
+  renderMSel(); renderMList();
+}
+
+// ════════════════════════════════════════════════
+// 미매칭 트레이 + 임시 컬럼 패널 + 드래그앤드롭 매핑
+// ════════════════════════════════════════════════
+
+// 현재 열려있는 임시 컬럼 목록 (sourceIdx 배열)
+S.openTempCols = S.openTempCols || [];
+
+// ── 미매칭 컬럼 트레이 렌더링 ──
+function renderUnmatchedTray(){
+  if(!S.parsed) return;
+  const tray=$('unmatched-tray');
+
+  // sourceIdx별로 매핑된 target 목록 파악
+  const idxToTargets={};
+  Object.entries(S.mapping).forEach(([tid, e])=>{
+    if(e.idxs && e.idxs.length>0){
+      e.idxs.forEach(i=>{
+        if(!idxToTargets[i]) idxToTargets[i]=[];
+        idxToTargets[i].push(tid);
+      });
+    }
+  });
+
+  // 완전 미매칭: 어디에도 없는 컬럼
+  const unmatched=S.parsed.cols.filter(c=>!idxToTargets[c.idx]);
+
+  tray.style.display='flex';
+  const label=tray.querySelector('.tray-label');
+  tray.innerHTML='';
+  tray.appendChild(label);
+
+  if(unmatched.length===0){
+    const msg=document.createElement('span');
+    msg.style.cssText='font-size:12px;color:#a3a3a3;padding:2px 6px;font-style:italic';
+    msg.textContent='모든 컬럼이 매핑되었습니다';
+    tray.appendChild(msg);
+    return;
+  }
+
+  unmatched.forEach(col=>{
+    const isOpen=S.openTempCols.includes(col.idx);
+    const btn=document.createElement('button');
+    btn.className='tray-btn'+(isOpen?' active':'');
+    const sample=col.samps[0]||'';
+    btn.title=`샘플: ${col.samps.slice(0,3).join(' / ')||'없음'}`;
+    btn.innerHTML=`${esc(col.name)}${sample?`<span class="tray-sample">${esc(sample)}</span>`:''}`;
+    btn.onclick=()=>toggleTempCol(col.idx);
+    tray.appendChild(btn);
+  });
+}
+
+// ── 임시 컬럼 열기/닫기 토글 ──
+function toggleTempCol(srcIdx){
+  if(!S.openTempCols) S.openTempCols=[];
+  const i=S.openTempCols.indexOf(srcIdx);
+  if(i>=0){ S.openTempCols.splice(i,1); }
+  else     { S.openTempCols.push(srcIdx); }
+  renderTempPanel();
+  renderUnmatchedTray();
+}
+
+function closeAllTempCols(){
+  S.openTempCols=[];
+  renderTempPanel();
+  renderUnmatchedTray();
+}
+
+// ── 임시 컬럼 패널 렌더링 ──
+function renderTempPanel(){
+  const panel=$('temp-col-panel');
+  const wrap=$('temp-cols-wrap');
+  if(!S.openTempCols||S.openTempCols.length===0){
+    panel.classList.remove('open');
+    wrap.innerHTML='';
+    return;
+  }
+  panel.classList.add('open');
+  wrap.innerHTML='';
+
+  const SHOW=Math.min((S.parsed?.rows?.length||0),50);
+
+  S.openTempCols.forEach(srcIdx=>{
+    const colMeta=S.parsed.cols.find(c=>c.idx===srcIdx);
+    if(!colMeta) return;
+
+    const colEl=document.createElement('div');
+    colEl.className='temp-col';
+    colEl.dataset.srcIdx=srcIdx;
+
+    // 헤더
+    const hdr=document.createElement('div');
+    hdr.className='temp-col-hdr';
+    hdr.draggable=true;
+    hdr.innerHTML=`<span class="drag-hint">⠿</span><span class="temp-col-name" title="${esc(colMeta.name)}">${esc(colMeta.name)}</span><button class="col-close" onclick="toggleTempCol(${srcIdx});event.stopPropagation()">✕</button>`;
+    hdr.addEventListener('dragstart', e=>tempColDragStart(e, srcIdx, colMeta.name));
+    hdr.addEventListener('dragend',   tempColDragEnd);
+    colEl.appendChild(hdr);
+
+    // 데이터 셀 — 셀 전체도 드래그 가능
+    const rows=S.parsed.rows;
+    for(let ri=0;ri<SHOW;ri++){
+      const val=String(rows[ri]?.[srcIdx]||'').trim();
+      const cell=document.createElement('div');
+      cell.className='temp-col-cell'+(val?'':' temp-col-empty');
+      cell.textContent=val||'—';
+      cell.title=val;
+      // 셀도 draggable — 헤더와 동일한 dragstart
+      cell.draggable=true;
+      cell.style.cursor='grab';
+      cell.addEventListener('dragstart', e=>tempColDragStart(e, srcIdx, colMeta.name));
+      cell.addEventListener('dragend',   tempColDragEnd);
+      colEl.appendChild(cell);
+    }
+    wrap.appendChild(colEl);
+  });
+}
+
+// ════════════════════════════════════════════════
+// 임시 컬럼 → target 헤더 드래그앤드롭 매핑
+// ════════════════════════════════════════════════
+let tempDragSrcIdx=null;
+let tempDragName='';
+let tempDragFromTargetId=null;  // 이동 출발 target (null = 임시패널에서 온 것)
+const ghost=$('drag-ghost');
+
+function tempColDragStart(e, srcIdx, name){
+  tempDragSrcIdx=srcIdx;
+  tempDragName=name;
+  tempDragFromTargetId=null; // 임시패널 드래그는 출발지 없음
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain', String(srcIdx));
+  ghost.textContent='📌 '+name;
+  ghost.style.display='block';
+  const blank=document.createElement('div');
+  blank.style.cssText='position:fixed;left:-9999px';
+  document.body.appendChild(blank);
+  e.dataTransfer.setDragImage(blank,0,0);
+  setTimeout(()=>blank.remove(),0);
+}
+
+function bHeaderDragStart(e, srcIdx, name, fromTargetId){
+  tempDragSrcIdx=srcIdx;
+  tempDragName=name;
+  tempDragFromTargetId=fromTargetId||null; // 매핑 열에서 드래그 = 출발지 있음
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain', String(srcIdx));
+  ghost.textContent='↔️ '+name;
+  ghost.style.display='block';
+  const blank=document.createElement('div');
+  blank.style.cssText='position:fixed;left:-9999px';
+  document.body.appendChild(blank);
+  e.dataTransfer.setDragImage(blank,0,0);
+  setTimeout(()=>blank.remove(),0);
+}
+
+// dragend는 drop 이후에 실행됨 — 전역 상태 정리만
+function tempColDragEnd(e){
+  ghost.style.display='none';
+  document.querySelectorAll('.drop-target-hover,.dragging-col').forEach(el=>{
+    el.classList.remove('drop-target-hover','dragging-col');
+  });
+  // srcIdx는 drop 핸들러 완료 후 정리 (drop이 먼저 실행되므로 안전)
+  setTimeout(()=>{ tempDragSrcIdx=null; tempDragFromTargetId=null; },0);
+}
+
+// target 헤더 th 또는 데이터 td에 dragover/drop 이벤트 위임
+document.addEventListener('dragover', e=>{
+  if(tempDragSrcIdx===null) return;
+  const th=e.target.closest('th[data-col-id]');
+  const td=e.target.closest('td.click-col');
+  const target=th||td;
+  if(!target) return;
+  e.preventDefault();
+  // 출발지와 같은 열이면 move 불필요 표시, 아니면 copy
+  e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.drop-target-hover').forEach(el=>el.classList.remove('drop-target-hover'));
+  if(th){
+    th.classList.add('drop-target-hover');
+  } else if(td){
+    const colId=td.getAttribute('onclick')?.match(/openModal\('([^']+)'\)/)?.[1];
+    if(colId){
+      const hth=document.querySelector(`th[data-col-id="${colId}"]`);
+      if(hth) hth.classList.add('drop-target-hover');
+      td.classList.add('drop-target-hover');
+    }
+  }
+});
+
+document.addEventListener('dragleave', e=>{
+  const th=e.target.closest('th[data-col-id]');
+  const td=e.target.closest('td.click-col');
+  if(th) th.classList.remove('drop-target-hover');
+  if(td) td.classList.remove('drop-target-hover');
+});
+
+document.addEventListener('drop', e=>{
+  if(tempDragSrcIdx===null) return;
+  const th=e.target.closest('th[data-col-id]');
+  const td=e.target.closest('td.click-col');
+  if(!th && !td) return;
+  e.preventDefault();
+
+  // targetId 결정
+  let targetId=null;
+  if(th){
+    targetId=th.dataset.colId;
+    th.classList.remove('drop-target-hover');
+  } else if(td){
+    targetId=td.getAttribute('onclick')?.match(/openModal\('([^']+)'\)/)?.[1];
+    td.classList.remove('drop-target-hover');
+    const hth=targetId?document.querySelector(`th[data-col-id="${targetId}"]`):null;
+    if(hth) hth.classList.remove('drop-target-hover');
+  }
+  if(!targetId) return;
+
+  const srcIdx=tempDragSrcIdx;
+  const fromId=tempDragFromTargetId;
+
+  // ── 이동: 출발지가 있고 다른 열로 드롭 → 원본에서 제거 후 대상에 추가 ──
+  if(fromId && fromId !== targetId){
+    const fromEntry=S.mapping[fromId];
+    if(fromEntry){
+      fromEntry.idxs=fromEntry.idxs.filter(i=>i!==srcIdx);
+      fromEntry.manual=true;
+      if(fromEntry.idxs.length===0) delete S.mapping[fromId];
+    }
+    // 대상에 추가
+    const existing=S.mapping[targetId];
+    if(existing){
+      if(!existing.idxs.includes(srcIdx)){ existing.idxs.push(srcIdx); existing.manual=true; }
+    } else {
+      S.mapping[targetId]={idxs:[srcIdx],conf:1.0,manual:true};
+    }
+  } else if(!fromId){
+    // 임시 패널에서 드래그 → 추가(복사) 개념
+    const existing=S.mapping[targetId];
+    if(existing){
+      if(!existing.idxs.includes(srcIdx)){ existing.idxs.push(srcIdx); existing.manual=true; }
+    } else {
+      S.mapping[targetId]={idxs:[srcIdx],conf:1.0,manual:true};
+    }
+  }
+  // fromId === targetId: 같은 열 드롭 → 아무것도 안 함
+
+  // 피드백 flash
+  const flashTh=document.querySelector(`th[data-col-id="${targetId}"]`);
+  if(flashTh){
+    flashTh.classList.add('mapped-flash');
+    setTimeout(()=>flashTh.classList.remove('mapped-flash'),600);
+  }
+
+  tempDragFromTargetId=null;
+  renderSpreadsheet();
+  renderUnmatchedTray();
+  renderTempPanel();
+  updateStat();
+});
+// 매핑으로 복사된 raw 값을 받아 A양식 규칙으로 가공
+// ════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════
+// 사이버윈 변환 규칙
+// ════════════════════════════════════════════════
+function applyCyberwinTransform(o, raw){
+  const num = v => parseFloat(String(v||'').replace(/,/g,''))||0;
+
+  // 1) 태양광전압 자동 계산 (태양광용량이 0이 아닐 때)
+  const solarCap = num(o['cont_solar_cap']);
+  if(solarCap > 0){
+    o['cont_solar_volt'] = solarCap <= 500 ? '380' : '22900';
+  } else {
+    o['cont_solar_volt'] = '';
+  }
+
+  // 2) 용량 0이면 빈값으로 (수전용량=idx4, 발전용량=idx6, 태양광용량=idx8 → 사이버윈 4행헤더 기준)
+  //    buildRowObj 단계에서 이미 값이 들어있으므로 여기서 0 체크
+  ['cont_recv_cap','cont_gen_cap','cont_solar_cap'].forEach(k=>{
+    if(num(o[k])===0) o[k]='';
+  });
+  // 태양광용량도 재체크
+  if(num(o['cont_solar_cap'])===0) o['cont_solar_cap']='';
+
+  // 3) 계약총액 = 공급가액 + 부가세
+  const supply = num(o['bill_supply']);
+  const vat    = num(o['bill_vat']);
+  if(supply>0 || vat>0){
+    o['bill_total'] = String(supply + vat);
+  }
+
+  // 4) 납부기한월/납부기한일 — 사이버윈 수금일 raw값에서 파싱
+  //    사이버윈 수금일 idx=46 → bill_due_month, bill_due_day 둘 다 같은 열
+  //    raw값 예: "당월 10일", "차월 25일"
+  const rawDue = String(o['bill_due_month']||'').trim(); // 같은 열 데이터
+  if(rawDue){
+    // 납부기한월: 앞 두글자 (당월 or 차월)
+    o['bill_due_month'] = rawDue.slice(0,2);
+    // 납부기한일: 숫자만 추출 ('일' 제거)
+    const dayMatch = rawDue.match(/(\d+)/);
+    o['bill_due_day'] = dayMatch ? dayMatch[1] : '';
+  }
+
+  // 5) 계산서발행 변환: 발행→사용, 미발행→미사용 (정책 변경)
+  const rawInv = String(o['bill_invoice']||'').trim();
+  if(rawInv.includes('미발행')||rawInv==='미사용')             o['bill_invoice']='미사용';
+  else if(rawInv.includes('발행')||rawInv==='발행'||rawInv==='사용') o['bill_invoice']='사용';
+
+  // 6) 청구일(계산서 칼럼): 숫자만 추출 (예: '매월 25일 발행' → '25')
+  const rawDate = String(o['bill_date']||'').trim();
+  if(rawDate){
+    const dateMatch = rawDate.match(/\d+/);
+    o['bill_date'] = dateMatch ? dateMatch[0] : '';
+  }
+
+  return o;
+}
+
+// ════════════════════════════════════════════════
+function applyBigthreeTransform(o){
+  const num = v => parseFloat(String(v||'').replace(/,/g,''))||0;
+
+  // 1) 계약총액 = 공급가액 + 부가세
+  const supply = num(o['bill_supply']);
+  const vat    = num(o['bill_vat']);
+  if(supply>0 || vat>0){
+    o['bill_total'] = String(supply + vat);
+  }
+
+  // 2) 과세유형 변환: 제외→비과세, 신고→과세
+  const rawTax = String(o['bill_tax_type']||'').trim();
+  if(rawTax.includes('제외'))      o['bill_tax_type']='비과세';
+  else if(rawTax.includes('신고')) o['bill_tax_type']='과세';
+
+  // 3) 계산서발행 변환: 계산서없음→미사용, 계산서포함→사용
+  const rawInv = String(o['bill_invoice']||'').trim();
+  if(rawInv.includes('없음')||rawInv.includes('없')){ o['bill_invoice']='미사용'; }
+  else if(rawInv.includes('포함')||rawInv.includes('계산서')){ o['bill_invoice']='사용'; }
+
+  // 4) 청구형태 변환: OCR발행→지로, 매출전표만등록→계산서
+  const rawType = String(o['bill_type']||'').trim();
+  if(rawType.includes('OCR'))       o['bill_type']='지로';
+  else if(rawType.includes('매출전표')) o['bill_type']='계산서';
+
+  return o;
+}
+
+// ════════════════════════════════════════════════
+// 일렉인 변환 규칙
+// ════════════════════════════════════════════════
+function applyElecInTransform(o, raw){
+  const num = v => parseFloat(String(v||'').replace(/,/g,''))||0;
+
+  // 0) 수전전압/수전용량/태양광전압/태양광용량 — 값이 0이면 비움
+  ['cont_recv_volt','cont_recv_cap','cont_solar_volt','cont_solar_cap'].forEach(k=>{
+    if(num(o[k])===0) o[k]='';
+  });
+
+  // 1) 전압형태: 수전/발전/태양광 중 하나라도 6600 초과→특고압, 모두 1000 이하→저압
+  const rv = num(o['cont_recv_volt']);
+  const gv = num(o['cont_gen_volt']);
+  const sv = num(o['cont_solar_volt']);
+  const volts = [rv, gv, sv].filter(v=>v>0);
+  if(volts.length>0){
+    if(volts.some(v=>v>6600))           o['cont_volt_type']='특고압';
+    else if(volts.every(v=>v<=1000))     o['cont_volt_type']='저압';
+    else                                 o['cont_volt_type']='고압';
+  }
+
+  // 2) 계산서발행(발행구분): 세금계산서→사용, 그 외→미사용
+  const rawInv = String(o['bill_invoice']||'').trim();
+  const invoice = rawInv.includes('세금계산서') ? '사용' : '미사용';
+  o['bill_invoice'] = invoice;
+
+  // 3) 청구형태: 발행구분 × 지로발행 조합
+  //    일렉인 지로발행=idx 71 → bill_type에 raw로 들어있음
+  const rawJiro = String(o['bill_type']||'').trim().toLowerCase(); // '체크' or '언체크'
+  const isJiro  = rawJiro.includes('체크') && !rawJiro.includes('언체크');
+  const isTax   = rawInv.includes('세금계산서');
+  if(isTax  && isJiro)  o['bill_type']='지로';
+  else if(isTax && !isJiro) o['bill_type']='계산서';
+  else if(!isTax && isJiro) o['bill_type']='지로';
+  else                      o['bill_type']='현금';
+
+  // 4) 과세유형
+  const rawTax = String(o['bill_tax_type']||'').trim();
+  // 일렉인 과세형태값 그대로 사용 (이미 한글로 되어있을 수 있음)
+  // 필요시 추가 변환
+
+  // 5) 공급가액/부가세 자동계산
+  const total    = num(o['bill_total']);
+  const taxType  = String(o['bill_tax_type']||'').trim();
+  const billType = o['bill_type'];
+  const isGwase  = taxType.includes('과세') && !taxType.includes('비');
+
+  if(isGwase && invoice==='사용'){
+    // 과세 + 사용: 총액/11*10, 총액/11
+    o['bill_supply'] = total>0 ? String(Math.round(total*10/11)) : '';
+    o['bill_vat']    = total>0 ? String(total - Math.round(total*10/11)) : '';
+  } else if(!isGwase && invoice==='사용'){
+    // 비과세 + 사용: 공급가액=총액, 부가세=0
+    o['bill_supply'] = total>0 ? String(total) : '';
+    o['bill_vat']    = '0';
+  } else if(isGwase && invoice==='미사용' && billType==='지로'){
+    // 과세 + 미사용 + 지로
+    o['bill_supply'] = total>0 ? String(Math.round(total*10/11)) : '';
+    o['bill_vat']    = total>0 ? String(total - Math.round(total*10/11)) : '';
+  } else {
+    // 과세 + 미사용 + 현금 (or 나머지)
+    o['bill_supply'] = total>0 ? String(total) : '';
+    o['bill_vat']    = '0';
+  }
+
+  return o;
+}
+
+// ════════════════════════════════════════════════
+// TNB소프트 변환 규칙
+// ════════════════════════════════════════════════
+function applyTNBTransform(rowObj){
+  // rowObj: { targetId -> rawValue(string) }
+  // 반환: 가공된 동일 구조 객체
+
+  const o = Object.assign({}, rowObj); // 복사본
+
+  // ── 헬퍼 ──
+  const num = v => parseFloat(String(v||'').replace(/,/g,'')) || 0;
+
+  // ─────────────────────────────────────────────
+  // 계약정보
+  // ─────────────────────────────────────────────
+
+  // 1) 계약형태: 수전용량≤1000 AND 발전용량≤500 AND 합계≤1500 → 안전관리, 아니면 비움
+  const recvCap   = num(o['cont_recv_cap']);
+  const genCap    = num(o['cont_gen_cap']);
+  const solarCap  = num(o['cont_solar_cap']);
+  if (recvCap > 0 || genCap > 0) {
+    if (recvCap <= 1000 && genCap <= 500 && (recvCap + genCap) <= 1500) {
+      o['cont_type'] = '안전관리';
+    } else {
+      o['cont_type'] = '';
+    }
+  }
+
+  // 2) 전압형태: 수전전압 기준
+  const recvVolt = num(o['cont_recv_volt']);
+  if (recvVolt > 0) {
+    if      (recvVolt >= 6600) o['cont_volt_type'] = '특고압';
+    else if (recvVolt <= 1000) o['cont_volt_type'] = '저압';
+    else                       o['cont_volt_type'] = '고압';
+  }
+
+  // 3) 계약용량: 값이 있으면 그대로, 비어있으면 수전용량+발전용량+태양광용량 합산
+  const rawCap = num(o['cont_capacity']);
+  if (!rawCap) {
+    const sum = recvCap + genCap + solarCap;
+    o['cont_capacity'] = sum > 0 ? String(sum) : '';
+  }
+
+  // ─────────────────────────────────────────────
+  // 청구정보
+  // ─────────────────────────────────────────────
+
+  // 4) 계산서발행: E-발행/발행 → 사용 / 미발행 → 미사용 (정책 변경)
+  const rawInvoice = String(o['bill_invoice']||'').trim();
+  let invoice = '';
+  if      (rawInvoice.includes('E-발행') || rawInvoice==='발행' || rawInvoice==='사용') invoice = '사용';
+  else if (rawInvoice.includes('미발행') || rawInvoice==='미사용')                      invoice = '미사용';
+  else if (rawInvoice)                                                                   invoice = rawInvoice;
+  o['bill_invoice'] = invoice;
+
+  // 5) 과세유형: 발행이면서 VAT값이 포함·별도·과세 중 하나 → '과세' / 그 외 → 비움
+  //    (미발행이거나 VAT값이 없어도, 발행이기만 하면 '과세'로 처리)
+  const rawVat = String(o['bill_tax_type']||'').trim();
+  if (invoice === '발행') {
+    // 발행이면 → 포함/별도/과세 키워드 있을 때 과세, 없어도 기본 과세
+    if (rawVat.includes('포함') || rawVat.includes('별도') || rawVat.includes('과세') || rawVat === '') {
+      o['bill_tax_type'] = '과세';
+    } else if (rawVat.includes('비과세')) {
+      o['bill_tax_type'] = '비과세';
+    } else {
+      o['bill_tax_type'] = '과세'; // 발행이면 기본 과세
+    }
+  } else {
+    o['bill_tax_type'] = ''; // 미발행이면 비움
+  }
+
+  // 6) 공급가액 / 부가세: 발행일 때 계약총액에서 역산
+  const total = num(o['bill_total']);
+  if (invoice === '발행' && total > 0) {
+    const supply = Math.round(total * 10 / 11);
+    const vat    = total - supply;
+    o['bill_supply'] = String(supply);
+    o['bill_vat']    = String(vat);
+  } else {
+    o['bill_supply'] = total > 0 ? String(total) : '';
+    o['bill_vat']    = total > 0 ? '0' : '';
+  }
+
+  // 7) 청구형태: TNB값 → 지킴E값 변환
+  //    GIRO/Giro/지로 → 지로
+  //    계좌이체 → 계산서
+  //    CMS → CMS
+  //    카드 → 카드
+  const rawBillType = String(o['bill_type']||'').trim();
+  const billTypeMap = [
+    { keys:['giro','지로','GIRO'],    val:'지로' },
+    { keys:['계좌이체'],               val:'계산서' },
+    { keys:['cms','CMS'],             val:'CMS' },
+    { keys:['카드'],                   val:'카드' },
+    { keys:['현금'],                   val:'현금' },
+  ];
+  const matched = billTypeMap.find(m =>
+    m.keys.some(k => rawBillType.toLowerCase().includes(k.toLowerCase()))
+  );
+  if (matched) o['bill_type'] = matched.val;
+
+  // 8) 납부기한일: "32 당월말일" 또는 "32" → "31"
+  const rawDueDay = String(o['bill_due_day']||'').trim();
+  if (rawDueDay.includes('32')) {
+    o['bill_due_day'] = '31';
+  }
+
+  return o;
+}
+
+// 한 행(raw row배열)을 매핑 기준으로 읽어 { targetId→값 } 객체 생성
+function buildRowObj(row){
+  const obj={};
+  const tmpl=getTemplateName();
+
+  A_COLS.forEach(col=>{
+    const e=S.mapping[col.id];
+    if(!e||!e.idxs.length){ obj[col.id]=''; return; }
+
+    // ── 일렉인 특별처리: 발전전압(상용/비상용 중 높은 값), 발전용량(합산) ──
+    if(tmpl==='일렉인' && e.idxs.length>=2){
+      const vals = e.idxs.map(i=>row[i]||'');
+      const nums = vals.map(v=>parseFloat(String(v).replace(/,/g,''))||0);
+
+      if(col.id==='cont_gen_volt'){
+        // 전압: 두 값 중 높은 것 사용
+        const maxV = Math.max(...nums);
+        obj[col.id] = maxV>0 ? String(maxV) : '';
+        return;
+      }
+      if(col.id==='cont_gen_cap'){
+        // 용량: 합산
+        const sum = nums.reduce((a,b)=>a+b,0);
+        obj[col.id] = sum>0 ? String(sum) : '';
+        return;
+      }
+    }
+
+    // 일반: 여러 idxs면 공백으로 합치기
+    obj[col.id] = e.idxs.map(i=>row[i]||'').filter(Boolean).join(' ');
+  });
+  return obj;
+}
+
+// 변환 적용 여부
+function isTNBMode(){
+  return Object.values(S.mapping).some(e=>e.template==='TNB소프트');
+}
+function getTemplateName(){
+  const e=Object.values(S.mapping).find(e=>e.template);
+  return e?e.template:'';
+}
+
+// rowObj → A_COLS 순서 배열
+function rowObjToArr(obj){
+  return A_COLS.map(col=>obj[col.id]||'');
+}
+
+// ── 공통 변환 디스패처 ──
+function applyVendorTransform(obj, raw, tmplName){
+  const t = tmplName || getTemplateName();
+  if(t==='TNB소프트')  return applyTNBTransform(obj);
+  if(t==='사이버윈')   return applyCyberwinTransform(obj, raw);
+  if(t==='빅쓰리')     return applyBigthreeTransform(obj);
+  if(t==='일렉인')     return applyElecInTransform(obj, raw);
+  return obj;
+}
+
+function renderPreviewStep(){
+  const tot=S.parsed.rows.length;
+  const m=Object.values(S.mapping).filter(e=>e.idxs.length).length;
+  const tmplName=getTemplateName();
+  $('prev-sub').textContent=`총 ${tot}행 / ${m}개 컬럼 매핑`+(tmplName?' | 🔄 '+tmplName+' 변환 적용':'')+' (미리보기 최대 30행)';
+  $('succ-bar').style.display='none';
+  const SHOW=Math.min(tot,30);
+
+  let thead=`<tr>
+    <th class="rn-th">#</th>
+    ${A_COLS.map(col=>{
+      const entry=S.mapping[col.id];
+      const srcNames=entry?entry.idxs.map(i=>S.parsed.cols.find(c=>c.idx===i)?.name||'').join(', '):'';
+      return`<th title="${esc(col.name)}">${esc(col.name)}${col.req?'<span style="color:#f87171"> *</span>':''}
+        <div class="prev-sub-header">${srcNames?'← '+esc(srcNames):'—'}</div></th>`;
+    }).join('')}
+  </tr>`;
+  $('prev-thead').innerHTML=thead;
+
+  let tbody='';
+  for(let ri=0;ri<SHOW;ri++){
+    const raw=S.parsed.rows[ri];
+    const obj=applyVendorTransform(buildRowObj(raw), raw, tmplName);
+    tbody+=`<tr><td class="rn-td">${ri+1}</td>`;
+    A_COLS.forEach(col=>{
+      const val=obj[col.id]||'';
+      tbody+=`<td class="${val?'':'empty-v'}" title="${esc(val)}">${esc(val)||'—'}</td>`;
+    });
+    tbody+='</tr>';
+  }
+  $('prev-tbody').innerHTML=tbody;
+}
+
+// ════════════════════════════════════════════════
+// 엑셀 다운로드
+// ════════════════════════════════════════════════
+function doDownload(){
+  const tmplName=getTemplateName();
+  const wb=XLSX.utils.book_new();
+  const row1=Array(A_COLS.length).fill('');
+  let lastSec='';
+  A_COLS.forEach((c,i)=>{if(c.sec!==lastSec){row1[i]=c.sec;lastSec=c.sec;}});
+  const row2=Array(A_COLS.length).fill('');
+  row2[0]='지킴E 일괄 업로드 양식';
+  const row3=A_COLS.map(c=>c.name);
+  const data=S.parsed.rows.map(raw=>{
+    const obj=applyVendorTransform(buildRowObj(raw), raw, tmplName);
+    return rowObjToArr(obj);
+  });
+  const ws=XLSX.utils.aoa_to_sheet([row1,row2,row3,...data]);
+  ws['!cols']=A_COLS.map(()=>({wch:16}));
+  XLSX.utils.book_append_sheet(wb,ws,'고객 현황');
+  XLSX.writeFile(wb,'지킴E_일괄업로드양식.xlsx');
+  $('succ-bar').style.display='block';
+}
+
+// ════════════════════════════════════════════════
+// 유틸
+// ════════════════════════════════════════════════
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function showErr(msg){const e=$('err');e.textContent=msg;e.style.display='block';$('dz-loading').style.display='none';$('dz-content').style.display='block';}
+
+goStep(1);
+</script>
+<!-- 드래그 고스트 -->
+<div id="drag-ghost"></div>
+
+</body>
+</html>
