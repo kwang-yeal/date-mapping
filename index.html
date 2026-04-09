@@ -713,6 +713,30 @@ function resetAll(){
   $('filetype-sel').value='auto';
   $('hrow-sel').disabled=false;
   $('filetype-hint').textContent='';
+
+  // ── 이전 작업 흔적 전체 초기화 ──
+  // 스프레드시트
+  $('sheet-thead').innerHTML='';
+  $('sheet-tbody').innerHTML='';
+  // 섹션 탭
+  $('section-tabs').innerHTML='';
+  // 미매칭 트레이
+  const tray=$('unmatched-tray');
+  const label=tray.querySelector('.tray-label');
+  tray.innerHTML='';
+  if(label) tray.appendChild(label);
+  tray.style.display='none';
+  // 임시 컬럼 패널 닫기
+  $('temp-col-panel').classList.remove('open');
+  $('temp-cols-wrap').innerHTML='';
+  // 템플릿 뱃지 숨기기
+  $('tb-template-badge').style.display='none';
+  $('tb-stat').textContent='0 / 0 매핑';
+  // 드래그 고스트 숨기기
+  $('drag-ghost').style.display='none';
+  tempDragSrcIdx=null;
+  tempDragFromTargetId=null;
+
   goStep(1);
 }
 function resetUpload(){
