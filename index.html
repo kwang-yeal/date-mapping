@@ -1897,7 +1897,16 @@ function applyBigthreeTransform(o){
     o['bill_total'] = String(supply + vat);
   }
 
-  // 2) 과세유형: 제외→비과세, 신고→과세
+  // 2) 전압형태: 수전전압 수치 기반으로 자동 변환 (빅쓰리가 텍스트로 주므로 수치 우선)
+  //    ≥7000 → 특고압 / 1000초과~7000미만 → 고압 / ≤1000 → 저압
+  const recvVolt = parseFloat(String(o['cont_recv_volt']||'').replace(/,/g,''))||0;
+  if(recvVolt > 0){
+    if     (recvVolt >= 7000) o['cont_volt_type']='특고압';
+    else if(recvVolt >  1000) o['cont_volt_type']='고압';
+    else                      o['cont_volt_type']='저압';
+  }
+
+  // 3) 과세유형: 제외→비과세, 신고→과세
   const rawTax = String(o['bill_tax_type']||'').trim();
   if(rawTax.includes('제외'))       o['bill_tax_type']='비과세';
   else if(rawTax.includes('신고'))  o['bill_tax_type']='과세';
@@ -1938,7 +1947,7 @@ function applyElecInTransform(o, raw){
   const sv = num(o['cont_solar_volt']);
   const volts = [rv, gv, sv].filter(v=>v>0);
   if(volts.length>0){
-    if(volts.some(v=>v>6600))           o['cont_volt_type']='특고압';
+    if(volts.some(v=>v>=7000))           o['cont_volt_type']='특고압';
     else if(volts.every(v=>v<=1000))     o['cont_volt_type']='저압';
     else                                 o['cont_volt_type']='고압';
   }
@@ -2021,7 +2030,7 @@ function applyTNBTransform(rowObj){
   // 2) 전압형태: 수전전압 기준
   const recvVolt = num(o['cont_recv_volt']);
   if (recvVolt > 0) {
-    if      (recvVolt >= 6600) o['cont_volt_type'] = '특고압';
+    if      (recvVolt >= 7000) o['cont_volt_type'] = '특고압';
     else if (recvVolt <= 1000) o['cont_volt_type'] = '저압';
     else                       o['cont_volt_type'] = '고압';
   }
