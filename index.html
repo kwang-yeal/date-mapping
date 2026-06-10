@@ -1102,11 +1102,12 @@ const BIGTHREE_IDX_MAP = [
   {id:'bldg_mail_addr2',      srcIdx:[70]},   // BS 상세주소(수령지)
   {id:'bldg_rcv_tel',         srcIdx:[71]},   // BT 수신자 연락처
 
-  // ── 지로및세금계산서발행정보 (BW~CK: 기존 BN~CB에서 +9 이동) ──
+  // ── 지로및세금계산서발행정보 (BW~CK) ──
   {id:'bill_supply',          srcIdx:[74]},   // BW 공급가액 ← 계약금액
   {id:'bill_vat',             srcIdx:[75]},   // BX 부가세
-  {id:'bill_invoice',         srcIdx:[77]},   // BZ 계산서발행 ← 계산서유형
-  {id:'bill_type',            srcIdx:[79]},   // CB 청구형태 ← 지로유형
+  {id:'bill_receipt',         srcIdx:[77]},   // BZ 청구/영수 ← 계산서유형(청구/영수)
+  {id:'bill_invoice',         srcIdx:[79]},   // CB 계산서발행 ← 지로유형(계산서없음 등)
+  {id:'bill_type',            srcIdx:[80]},   // CC 청구형태 ← 발행구분(OCR발행 등)
   {id:'bill_date',            srcIdx:[87]},   // CJ 청구일 ← ~일발행
   {id:'bill_due_month',       srcIdx:[84]},   // CG 납부기한월 ← 납입기한
   {id:'bill_due_day',         srcIdx:[85]},   // CH 납부기한일 ← (까지)
@@ -1896,20 +1897,24 @@ function applyBigthreeTransform(o){
     o['bill_total'] = String(supply + vat);
   }
 
-  // 2) 과세유형 변환: 제외→비과세, 신고→과세
+  // 2) 과세유형: 제외→비과세, 신고→과세
   const rawTax = String(o['bill_tax_type']||'').trim();
-  if(rawTax.includes('제외'))      o['bill_tax_type']='비과세';
-  else if(rawTax.includes('신고')) o['bill_tax_type']='과세';
+  if(rawTax.includes('제외'))       o['bill_tax_type']='비과세';
+  else if(rawTax.includes('신고'))  o['bill_tax_type']='과세';
 
-  // 3) 계산서발행 변환: 계산서없음→미사용, 계산서포함→사용
+  // 3) 계산서발행: CB(지로유형) 값 변환
+  //    계산서없음 → 미사용 / 계산서있음·계산서포함·E-Tax 등 → 사용
   const rawInv = String(o['bill_invoice']||'').trim();
-  if(rawInv.includes('없음')||rawInv.includes('없')){ o['bill_invoice']='미사용'; }
-  else if(rawInv.includes('포함')||rawInv.includes('계산서')){ o['bill_invoice']='사용'; }
+  if(rawInv.includes('없음'))                             o['bill_invoice']='미사용';
+  else if(rawInv.includes('있음')||rawInv.includes('E-Tax')||
+          rawInv.includes('계산서')||rawInv.includes('전자'))  o['bill_invoice']='사용';
 
-  // 4) 청구형태 변환: OCR발행→지로, 매출전표만등록→계산서
+  // 4) 청구형태: CC(발행구분) 값 변환
+  //    OCR발행 → 지로 / 매출전표만등록 → 계산서 / CMS → CMS
   const rawType = String(o['bill_type']||'').trim();
-  if(rawType.includes('OCR'))       o['bill_type']='지로';
+  if(rawType.includes('OCR'))          o['bill_type']='지로';
   else if(rawType.includes('매출전표')) o['bill_type']='계산서';
+  else if(rawType.toUpperCase().includes('CMS')) o['bill_type']='CMS';
 
   return o;
 }
