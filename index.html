@@ -1045,57 +1045,78 @@ function applyCyberwinTemplate(cols){ return buildIdxMapping(CYBERWIN_IDX_MAP,'�
 // 빅쓰리 매핑 템플릿 (5행 헤더 → 헤더행idx=4)
 // ════════════════════════════════════════════════
 const BIGTHREE_IDX_MAP = [
-  {id:'cust_mgmt_code',       srcIdx:[0]},    // a  업체관리코드 ← 코드
-  {id:'cust_name',            srcIdx:[2]},    // c  고객(사업자)명
-  {id:'cust_biz_no',         srcIdx:[14]},   // o  사업자번호
-  {id:'cust_ceo',            srcIdx:[15]},   // p  대표자
-  {id:'cust_addr1',          srcIdx:[48]},   // aw 기본주소(고객)
-  {id:'cust_addr2',          srcIdx:[49]},   // ax 상세주소(고객)
-  {id:'cust_tel',            srcIdx:[17]},   // r  대표연락처
-  {id:'bldg_name',           srcIdx:[1]},    // b  점검건물명
-  {id:'bldg_biz_name',       srcIdx:[45]},   // at 사업자(계약)명
-  {id:'bldg_biz_no',         srcIdx:[46]},   // au 건물 사업자번호
-  {id:'bldg_ceo',            srcIdx:[47]},   // av 건물 대표자
-  {id:'bldg_addr1',          srcIdx:[16]},   // q  건물 기본주소
-  {id:'bldg_mail_zip',       srcIdx:[59]},   // bh 우편번호(수령지)
-  {id:'bldg_mail_addr1',     srcIdx:[60]},   // bi 기본주소(수령지)
-  {id:'bldg_mail_addr2',     srcIdx:[61]},   // bj 상세주소(수령지)
-  {id:'bldg_rcv_name',       srcIdx:[58]},   // bg 수신자
-  {id:'bldg_rcv_tel',        srcIdx:[62]},   // bk 수신자 연락처
-  {id:'bldg_biz_type',       srcIdx:[50]},   // ay 업태
-  {id:'bldg_biz_item',       srcIdx:[51]},   // az 종목
-  {id:'cont_capacity',       srcIdx:[4]},    // e  계약용량
-  {id:'cont_volt_type',      srcIdx:[23]},   // x  전압형태
-  {id:'cont_recv_volt',      srcIdx:[24]},   // y  수전전압(V)
-  {id:'cont_recv_cap',       srcIdx:[25]},   // z  수전용량
-  {id:'cont_gen_volt',       srcIdx:[28]},   // ac 발전전압
-  {id:'cont_gen_cap',        srcIdx:[29]},   // ad 발전용량
-  {id:'cont_solar_volt',     srcIdx:[30]},   // ae 태양광전압
-  {id:'cont_solar_cap',      srcIdx:[31]},   // af 태양광용량
-  {id:'cont_score',          srcIdx:[3]},    // d  관리점수(가중치)
-  {id:'cont_insp_cnt',       srcIdx:[36]},   // ak 월점검횟수
-  {id:'cont_inspector',      srcIdx:[7]},    // h  점검자
-  {id:'cont_inspector2',     srcIdx:[6]},    // g  2ND
-  {id:'cont_sales',          srcIdx:[5]},    // f  영업자
-  {id:'cont_status',         srcIdx:[20]},   // u  계약진행상태
-  {id:'cont_start_date',     srcIdx:[9]},    // j  계약일
-  {id:'cont_end_date',       srcIdx:[11]},   // l  계약만료일
-  {id:'cont_insp_cycle',     srcIdx:[38]},   // am 정기점검 주기(년)
-  {id:'cont_last_insp',      srcIdx:[39]},   // an 최종검사일
-  {id:'cont_mgr_name',       srcIdx:[83]},   // cf 관리담당자
-  {id:'cont_mgr_tel',        srcIdx:[84]},   // cg 관리담당자 연락처
-  {id:'cont_ctr_name',       srcIdx:[52]},   // ba 계약담당자
-  {id:'cont_ctr_tel',        srcIdx:[53]},   // bb 계약담당자 연락처
-  {id:'cont_ctr_email',      srcIdx:[54]},   // bc 계약담당자 Email
-  {id:'bill_supply',         srcIdx:[65]},   // bn 공급가액(계약금액)
-  {id:'bill_vat',            srcIdx:[66]},   // bo 부가세 (별도 열)
-  {id:'bill_tax_type',       srcIdx:[56]},   // be 과세유형
-  {id:'bill_invoice',        srcIdx:[70]},   // bs 계산서발행
-  {id:'bill_type',           srcIdx:[71]},   // bt 청구형태
-  {id:'bill_receipt',        srcIdx:[68]},   // bq 청구/영수
-  {id:'bill_date',           srcIdx:[78]},   // ca 청구일
-  {id:'bill_due_month',      srcIdx:[75]},   // bx 납부기한월
-  {id:'bill_due_day',        srcIdx:[76]},   // by 납부기한일
+  // ── 기본사항 (변경없음 A~W) ──
+  {id:'cust_mgmt_code',       srcIdx:[0]},    // A  업체관리코드 ← 코드
+  {id:'cust_name',            srcIdx:[2]},    // C  고객(사업자)명 ← 상호(세금계산서)
+  {id:'cust_biz_no',          srcIdx:[14]},   // O  사업자번호
+  {id:'cust_ceo',             srcIdx:[15]},   // P  대표자
+  {id:'cust_tel',             srcIdx:[17]},   // R  전화번호
+  {id:'bldg_name',            srcIdx:[1]},    // B  점검건물명 ← 상호(협회)
+  {id:'bldg_addr1',           srcIdx:[16]},   // Q  건물 기본주소 ← 주소
+  {id:'bldg_biz_type',        srcIdx:[18]},   // S  업태
+  {id:'bldg_biz_item',        srcIdx:[19]},   // T  종목
+  {id:'cont_score',           srcIdx:[3]},    // D  관리점수(가중치)
+  {id:'cont_capacity',        srcIdx:[4]},    // E  계약용량 ← 총용량
+  {id:'cont_inspector',       srcIdx:[5]},    // F  점검자 ← 담당(선임)자
+  {id:'cont_inspector2',      srcIdx:[6]},    // G  2ND ← 관리자
+  {id:'cont_sales',           srcIdx:[5]},    // F  영업자 (담당자 동일)
+  {id:'cont_status',          srcIdx:[21]},   // V  계약진행상태 ← 계약구분
+  {id:'cont_start_date',      srcIdx:[10]},   // K  계약일 ← 시작일자
+  {id:'cont_end_date',        srcIdx:[11]},   // L  계약만료일 ← 종료일자
+
+  // ── 수전설비 (변경없음 X~AH) ──
+  {id:'cont_volt_type',       srcIdx:[23]},   // X  전압형태 ← 전압구분
+  {id:'cont_recv_volt',       srcIdx:[24]},   // Y  수전전압(V)
+  {id:'cont_recv_cap',        srcIdx:[25]},   // Z  수전용량
+  {id:'cont_gen_volt',        srcIdx:[26]},   // AA 발전전압 ← 상용(V)
+  {id:'cont_gen_cap',         srcIdx:[27]},   // AB 발전용량 ← 상용(KW)
+  {id:'cont_solar_volt',      srcIdx:[30]},   // AE 태양광전압 ← 태양(V)
+  {id:'cont_solar_cap',       srcIdx:[31]},   // AF 태양광용량 ← 태양(KW)
+
+  // ── 정기검사관관리(수전) (변경없음 AK~AO) ──
+  {id:'cont_insp_cnt',        srcIdx:[36]},   // AK 월점검횟수
+  {id:'cont_insp_cycle',      srcIdx:[38]},   // AM 정기점검 주기(년) ← 검사주기(년)
+  {id:'cont_last_insp',       srcIdx:[39]},   // AN 최종검사일 ← 검사일자
+
+  // ── 정기검사관관리 (AY,AZ: 기존 AP,AQ에서 +9 이동) ──
+  // AY[50]=검사내용, AZ[51]=계전기유무 → 지킴E 매핑 없음(무시)
+
+  // ── 파워프래너 (BA,BB: 기존 AR,AS에서 +9 이동) ──
+  // BA[52]=아이디, BB[53]=비번 → 무시
+
+  // ── 전자계산서정보 (BC~BN: 기존 AT~BE에서 +9 이동) ──
+  {id:'bldg_biz_name',        srcIdx:[54]},   // BC 사업자(계약)명 ← 상호
+  {id:'bldg_biz_no',          srcIdx:[55]},   // BD 건물 사업자번호
+  {id:'bldg_ceo',             srcIdx:[56]},   // BE 건물 대표자
+  {id:'cust_addr1',           srcIdx:[57]},   // BF 기본주소(고객) ← 주소
+  {id:'cust_addr2',           srcIdx:[58]},   // BG 상세주소(고객)
+  {id:'cont_ctr_name',        srcIdx:[61]},   // BJ 계약담당자 ← 담당자
+  {id:'cont_ctr_tel',         srcIdx:[62]},   // BK 계약담당자 연락처
+  {id:'cont_ctr_email',       srcIdx:[63]},   // BL 계약담당자 Email
+  {id:'bill_tax_type',        srcIdx:[65]},   // BN 과세유형 ← 신고구분
+
+  // ── 지로우편물발송처 (BO~BV: 기존 BF~BM에서 +9 이동) ──
+  {id:'bldg_rcv_name',        srcIdx:[67]},   // BP 수신자 ← 수신인
+  {id:'bldg_mail_zip',        srcIdx:[68]},   // BQ 우편번호(수령지)
+  {id:'bldg_mail_addr1',      srcIdx:[69]},   // BR 기본주소(수령지)
+  {id:'bldg_mail_addr2',      srcIdx:[70]},   // BS 상세주소(수령지)
+  {id:'bldg_rcv_tel',         srcIdx:[71]},   // BT 수신자 연락처
+
+  // ── 지로및세금계산서발행정보 (BW~CK: 기존 BN~CB에서 +9 이동) ──
+  {id:'bill_supply',          srcIdx:[74]},   // BW 공급가액 ← 계약금액
+  {id:'bill_vat',             srcIdx:[75]},   // BX 부가세
+  {id:'bill_invoice',         srcIdx:[77]},   // BZ 계산서발행 ← 계산서유형
+  {id:'bill_type',            srcIdx:[79]},   // CB 청구형태 ← 지로유형
+  {id:'bill_date',            srcIdx:[87]},   // CJ 청구일 ← ~일발행
+  {id:'bill_due_month',       srcIdx:[84]},   // CG 납부기한월 ← 납입기한
+  {id:'bill_due_day',         srcIdx:[85]},   // CH 납부기한일 ← (까지)
+  {id:'bill_note2',           srcIdx:[88]},   // CK 특이사항 ← 계산서품목명
+
+  // ── 관리자정보 (CL~CT: 기존 CC~CK에서 +9 이동) ──
+  {id:'cont_mgr_name',        srcIdx:[92]},   // CO 관리담당자 ← 설비담당자
+  {id:'cont_mgr_tel',         srcIdx:[93]},   // CP 관리담당자 연락처 ← 설비담당TEL
+  {id:'cont_mgr_email',       srcIdx:[95]},   // CR 관리담당자 Email (추가)
+  // CQ[94]=회계담당자, CR[95]=회계담당TEL → 계약담당자로도 가능하나 위에서 BJ,BK로 이미 매핑
 ];
 function applyBigthreeTemplate(cols){ return buildIdxMapping(BIGTHREE_IDX_MAP,'빅쓰리'); }
 
